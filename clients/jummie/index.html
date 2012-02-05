@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+    ExtreMon Project
+    Copyright (C) 2009-2012 Frank Marien
+    frank@apsu.be
+  
+    This file is part of ExtreMon.
+    
+    ExtreMon is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+    ExtreMon is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+
+    Jummie JS Client by Koen De Causmaecker
+    koendc@gmail.com
+-->
+
+
+    <head>
+        <title>I Know</title>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.min.js"></script>
+        <script type="text/javascript" src="./js/jquery.stream-1.0.js"></script>
+        <script type="text/javascript" src="./js/jummie.js"></script>
+        <script type="text/javascript">
+$(function() {
+  var streamurl = getParameterByName("streamurl");
+  if (streamurl == "")
+    streamurl = "http://eidmw.yourict.net:17917/"
+  $.stream(streamurl, {
+    open: function() {
+      $("#textfield").removeAttr("disabled").focus();
+    },
+    message: function(event) {
+      var input = event.data.split("\n");
+      var line;
+      for (line in input) {
+        var keyval = input[line].split("=");
+        var key = keyval[0];
+        var value = keyval[1];
+        if (key == "") {
+          continue;
+        }
+        var textelement = document.getElementById(key + ".text");
+        if (textelement == null) {
+          var newviewvalue = $("<div id=\"" + key + "\"><span>" + key
+             + "</span>: <span id=\"" + key + ".text\">"
+             + value +"</span></div>");
+          var lines = $("#content div");
+          if (lines.length == 0) {
+            newviewvalue.appendTo("#content");
+          } else {
+            var minindex = 0;
+            var maxindex = lines.length - 1;
+            while (true) {
+              var middleindex = minindex + Math.floor((maxindex-minindex)/2);
+              if (middleindex == minindex) {
+                lines.eq(maxindex).before(newviewvalue);
+                break;
+              }
+              if (lines.eq(middleindex).attr("id") > key ) {
+                maxindex = middleindex;
+              } else {
+                minindex = middleindex;
+              }
+            }
+          }
+        } else {
+	  textelement.innerHTML = value;
+        }
+
+      }
+    },
+    close: function() {
+      $("#textfield").attr("disabled", "disabled");
+    },
+    messageLength: false,
+    messageSeparator: "\n\n",
+  });
+
+  $("#textfield").keyup(function(event) {
+    if (this.value == "") {
+      $('#content div').show();
+    } else {
+      $('#content div').hide();
+      $('#content div[id^="' + this.value + '"]').show();
+    }
+  });
+});
+
+        </script>
+
+        <style>
+        body {padding: 0; margin: 0; font-family: 'Trebuchet MS','Malgun Gothic'; font-size: 62.5%; color: #333333}
+        #editor {margin: 15px 25px;}
+        #textfield {width: 100%; height: 28px; line-height: 28px; font-family: 'Trebuchet MS','Malgun Gothic'; 
+                    border: medium none; border-color: #E5E5E5 #DBDBDB #D2D2D2; border-style: solid; border-width: 1px;}
+        #content {height: 100%; overflow-y: auto; padding: 0 25px;}
+        #content p {margin: 0; padding: 0; font-size: 1.3em; color: #444444; line-height: 1.7em; word-wrap: break-word;}
+        </style>
+    </head>
+    <body>
+        <div id="editor">
+            <input id="textfield" type="text" disabled="disabled" />
+        </div>
+        <div id="content"></div>
+    </body>
+
+</html>

@@ -1,0 +1,4 @@
+Install:
+* Download jquery-stream from http://code.google.com/p/jquery-stream/
+* Save the file to ./js/
+* Edit index.html 
