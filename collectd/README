@@ -1,0 +1,98 @@
+ExtreMon collectd plugin
+------------------------
+
+BUILDING:
+--------
+
+1) Get collectd source tree. E.g. from
+
+http://collectd.org/files/collectd-5.0.2.tar.bz2
+
+and unpack it.
+
+-------------------------
+
+2) add to src/Makefile.am
+
+---cut here---
+if BUILD_PLUGIN_WRITE_EXTREMON
+pkglib_LTLIBRARIES += write_extremon.la
+write_extremon_la_SOURCES = write_extremon.c
+write_extremon_la_LDFLAGS = -module -avoid-version
+write_extremon_la_CFLAGS = $(AM_CFLAGS)
+write_extremon_la_CXXFLAGS = -DCOLLECT_DEBUG
+collectd_LDADD += "-dlopen" write_extremon.la
+collectd_DEPENDENCIES += write_extremon.la
+endif
+---cut here---
+
+--------------------------
+
+3) add to configure.in
+
+
+---cut here---
+AC_PLUGIN([write_extremon],  [yes],          [extremon cauldron output plugin])
+---cut here---
+
+among the other AC_PLUGIN near the head of the file,
+
+---cut here---
+write_extremon  . . . $enable_write_extremon
+---cut here---
+
+among the other enable_somethings nearer the end of the file
+
+
+---------------------------
+
+4) add write_extremon.c to the src directory
+
+---------------------------
+
+5) ./configure, make, make install as per instructions in http://collectd.org/wiki/index.php/First_steps
+
+(You should see write_extremon -- yes near the end of the ./configure step)
+
+----------------------------
+
+6) Edit the collectd.conf you just installed
+
+add:
+
+---cut here---
+LoadPlugin write_extremon
+---cut here---
+
+somewhere in the list of LoadPlugins
+
+
+add a write_extremon plugin block (somewhere among the other Plugin blocks)
+
+---cut here---
+<Plugin write_extremon>
+    Host "224.0.0.1"
+    Port 1248
+    Prefix "be.apsu.thoth"
+</Plugin>
+---cut here---
+
+Make sure to set the prefix to something that makes sense to you, not "be.apsu.thoth" which is my laptop.
+
+---------------------------
+
+7) start your collectd. You should now see shuttles appear in the multicast group you set in your config, above.
+For example, using socat:
+
+$ socat UDP4-RECVFROM:1248,ip-add-membership=224.0.0.1:192.168.2.214 STDIO
+
+(replace 192.168.2.214 by your IP address, make sure you use the same multicast group (address) and port that is in your write_extremon Plugin config in collectd.conf
+
+Note: Unless you have some other process that has joined the right multicast group, you won't be able to see the packets using e.g. tcpdump.
+
+--------------------------
+
+8) I need to make this easier..  
+
+WKR
+Frank.
