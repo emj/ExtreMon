@@ -22,12 +22,49 @@
 #
 
 import 							sys
-import 							pyinotify
+import 							pyinotify,select
 from queue 				import 	Queue,Full
 from socket 			import 	error
 from extremon			import 	CauldronReceiver,CauldronServer
 from subprocess 		import 	Popen,PIPE
 from threading			import 	Thread
+
+READ_ONLY = select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR
+
+
+
+class StdOutAndErrCauldronRequestHandler(Thread):
+
+	def __init__(self,server,path,out,err):
+		Thread.__init__(self,name='StdOutAndErrCauldronRequestHandler %s' % (path))
+		self.daemon=True
+		self.server=server
+		self.path=path
+		self.out=out
+		self.out_fd=self.out.fileno()
+		self.err=err
+	
+	def run(self):
+		poller = select.poll()
+		poller.register(self.out,READ_ONLY)
+		poller.register(self.err,READ_ONLY)
+		self.running=True
+		print("StdOutAndErrCauldronRequestHandler %s running" % (self.path))
+
+		while self.running:
+			events = poller.poll(1000)
+			for fd, flag in events:
+				if flag & (select.POLLIN | select.POLLPRI):
+					if fd==self.out_fd:
+						print("stdout")
+					else:
+						print("stderr")
+				elif flag & (select.POLLHUP | select.POLLERR):
+					
+					
+
+	def stop(self):
+		self.running=False
 
 
 class StdInCauldronRequestHandler(Thread):
@@ -40,15 +77,20 @@ class StdInCauldronRequestHandler(Thread):
 	
 	def run(self):
 		self.outq=Queue(maxsize=10)
-		self.server.add_consumer(self)
 
 		try:
 			self.process=Popen(self.path,stdin=PIPE,stdout=PIPE,stderr=PIPE)
 			self.running=True
 			print("StdInCauldronRequestHandler %s running" % (self.path))
+
+			self.outputhandler=StdOutAndErrCauldronRequestHandler(self.server,self.path,self.process.stdout,self.process.stderr)
+			self.outputhandler.start()
+			
+			self.server.add_consumer(self)
 			while self.running:
 				try:
 					self.process.stdin.write(self.outq.get())
+					self.process.stdin.flush()
 					self.outq.task_done()
 				except error:
 					self.running=False
@@ -59,7 +101,7 @@ class StdInCauldronRequestHandler(Thread):
 		try:
 			self.outq.put(data,block=False)
 		except Full:
-			pass
+			print("StdInCauldronRequestHandler %s Cannot Cope.. Buffer Overflow.." % (self.path))
 
 	def stop(self):
 		self.running=False
@@ -126,4 +168,5 @@ if __name__=='__main__':
 		sys.exit(-1)
 	prefix=sys.argv[1]
 	StdInCauldronDispatcher(mcast_addr=('224.0.0.1',1249),prefix=prefix)
+
 
