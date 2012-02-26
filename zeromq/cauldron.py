@@ -25,7 +25,7 @@ class Cauldron(Thread):
         self.buffer_expiry=now+self.shuttle_age_threshold
 
     def flush_buffer(self,now):
-        self.buffer.extend(bytes('%s.cauldron.timestamp=%.2f\n%s.cauldron.counter=%d\n%s.cauldron.qsize=%d\n\n' % (self.prefix,now,self.prefix,self.counter,self.prefix,self.inq.qsize()),'UTF-8'))
+        self.buffer.extend(bytes('%s.cauldron.timestamp=%.2f\n%s.cauldron.counter=%d\n%s.cauldron.qsize=%d\n' % (self.prefix,now,self.prefix,self.counter,self.prefix,self.inq.qsize()),'UTF-8'))
         self.pub_socket.send(self.buffer)
         self.clear_buffer(now)
         self.counter+=1
@@ -48,8 +48,6 @@ class Cauldron(Thread):
                 self.buffer.extend(self.inq.get(timeout=self.shuttle_age_threshold))
             except Empty:
                 print("inq empty",file=sys.stderr)
-
-            print("buffer %d/%d" % (len(self.buffer),self.shuttle_size_threshold),file=sys.stderr)
 
             now=time.time()
             if(now>=self.buffer_expiry):
