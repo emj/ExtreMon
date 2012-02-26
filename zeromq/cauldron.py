@@ -1,93 +1,74 @@
-#
-#	ExtreMon Project
-#	Copyright (C) 2009-2012 Frank Marien
-#	frank@apsu.be
-#  
-#	This file is part of ExtreMon.
-#    
-#	ExtreMon is free software: you can redistribute it and/or modify
-#	it under the terms of the GNU General Public License as published by
-#	the Free Software Foundation, either version 3 of the License, or
-#	(at your option) any later version.
-#
-#	ExtreMon is distributed in the hope that it will be useful,
-#	but WITHOUT ANY WARRANTY; without even the implied warranty of
-#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#	GNU General Public License for more details.
-#
-#	You should have received a copy of the GNU General Public License
-#	along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
-#
+#!/usr/bin/python3
+import zmq,time,sys,traceback
+from threading import Thread,Lock
+from queue  import Queue,Empty
 
-import time,socket, struct
-from queue 		import Queue
-from threading 	import Thread,Lock
+class Cauldron(Thread):
+    def __init__(self,prefix,pull_endpoint,pub_endpoint,context=zmq.Context(),pull_hwm=128,pub_hwm=128,shuttle_size_threshold=32768,shuttle_age_threshold=.1):
+        Thread.__init__(self,name="Cauldron Publisher")
+        self.daemon=True
+        self.prefix=prefix
+        self.context=context
+        self.pull_endpoint=pull_endpoint
+        self.pull_hwm=int(pull_hwm)
+        self.pub_endpoint=pub_endpoint
+        self.pub_hwm=int(pub_hwm)
+        self.shuttle_size_threshold=int(shuttle_size_threshold)
+        self.shuttle_age_threshold=float(shuttle_age_threshold)
+        self.inq=Queue()
+        self.buffer=bytearray()
+        self.counter=0
+        self.clear_buffer(time.time())
 
-############################### CAULDRON ############################
+    def clear_buffer(self,now):
+        del self.buffer[:]
+        self.buffer_expiry=now+self.shuttle_age_threshold
 
-class CauldronReceiver:
-	""" subscribe to the multicast Cauldron at a certain port, handler is called with shuttles boiling at that port.
-	
-		pass an (address,port) tuple indicating what mcast group/port you want to subscribe to,
-		and a handler instance, which should implement a handle_shuttle(self, set) method,
-		then call receive_forever (which blocks): your handle_shuttle method will be called
-		with a set of (label,value) tuples for each shuttle that boils at the group/port you gave.
-	"""
-	def __init__(self,mcast_addr,handler):
-		(mcast_group,mcast_port)=mcast_addr
-		self.handler=handler
-		self.socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		self.socket.bind(('', mcast_port))
-		self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack("4sl", socket.inet_aton(mcast_group), socket.INADDR_ANY))
-		self.shuttle=set()
+    def flush_buffer(self,now):
+        self.buffer.extend(bytes('%s.cauldron.timestamp=%.2f\n%s.cauldron.counter=%d\n%s.cauldron.qsize=%d\n\n' % (self.prefix,now,self.prefix,self.counter,self.prefix,self.inq.qsize()),'UTF-8'))
+        self.pub_socket.send(self.buffer)
+        self.clear_buffer(now)
+        self.counter+=1
 
-	def receive_shuttle(self):
-		data=self.socket.recv(16384)
-		for line in str(data,'UTF-8').splitlines():
-			if len(line)>0:
-				(label,value)=line.split('=')
-				if label and value:
-					self.shuttle.add((label,value))
-		self.handler.handle_shuttle(set(self.shuttle))
-		self.shuttle.clear()
+    def bubble(self):
+        self.start()
+        pull_socket=self.context.socket(zmq.PULL)
+        pull_socket.setsockopt(zmq.HWM,self.pull_hwm)
+        pull_socket.bind(self.pull_endpoint)
+        while True:
+            self.inq.put(pull_socket.recv())
 
-	def receive_forever(self):
-		while True:
-			self.receive_shuttle()
+    def run(self):
+        self.pub_socket=self.context.socket(zmq.PUB)
+        self.pub_socket.setsockopt(zmq.HWM,self.pub_hwm)
+        self.pub_socket.bind(self.pub_endpoint)
+        self.running=True
+        while self.running:
+            try:
+                self.buffer.extend(self.inq.get(timeout=self.shuttle_age_threshold))
+            except Empty:
+                print("inq empty",file=sys.stderr)
+
+            print("buffer %d/%d" % (len(self.buffer),self.shuttle_size_threshold),file=sys.stderr)
+
+            now=time.time()
+            if(now>=self.buffer_expiry):
+                print("flushing because buffer too old",file=sys.stderr)
+                self.flush_buffer(now)
+                continue
+
+            if(len(self.buffer)>=self.shuttle_size_threshold):
+                print("flushing because buffer too full",file=sys.stderr)
+                self.flush_buffer(now)
+                continue
 
 
-class CauldronSender:
-	""" contribute to the multicast Cauldron at a certain port, adding values.
-	
-		pass an (address,port) tuple indicating what mcast group/port you want to contribute to,
-		call put(label,value) to contribute. the CauldronSender will accumulate values until either
-		max_shuttle_size are ready to send, or max_shuttle_age seconds have passed.
-		
-		WARNING: CauldronSender assumes a minimal boiling level where values are presented
-		         at least every max_shuttle_age seconds: If e.g. you present one value,
-		         and then none for minutes, that one value will not be contributed for
-		         minutes even if max_shuttle_age is far lower than that.
-	"""
-	def __init__(self,mcast_addr,max_shuttle_size=512,max_shuttle_age=.5):
-		self.mcast_addr=mcast_addr
-		self.sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-		self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL,1)
-		self.max_shuttle_size=max_shuttle_size
-		self.max_shuttle_age=max_shuttle_age
-		self.shuttle=set()
-		self.clear_shuttle()
-
-	def put(self,label,value):
-		_value=str(value)
-		if '=' in _value:
-			raise ValueError('"=" Is An Illegal Value In ExtreMon Labels And Values')
-		self.shuttle.add('%s=%s' % (label,_value))
-		if len(self.shuttle)>=self.max_shuttle_size or time.time()>=(self.shuttle_age+self.max_shuttle_age):
-			self.sock.sendto(bytes('%s\n\n' % ('\n'.join(self.shuttle)),'UTF-8'),self.mcast_addr)
-			self.clear_shuttle()
-
-	def clear_shuttle(self):
-		self.shuttle.clear()
-		self.shuttle_age=time.time()
-
+if __name__=='__main__':
+    try:
+        Cauldron(**dict([arg.split('=') for arg in sys.argv[1:]])).bubble()
+    except Exception as ex:
+        traceback.print_exc(file=sys.stderr)
+        print(file=sys.stderr)
+        print("Usage  : cauldron prefix=<prefix> pull_endpoint=<pull_endpoint> pub_endpoint=<pub_endpoint> [pull_hwm=<pull_hwm>] [pub_hwm=<pub_hwm>] [shuttle_size_threshold] [shuttle_age_threshold]",file=sys.stderr)
+        print("Example: cauldron prefix=be.apsu.mon pull_endpoint=tcp://127.0.0.1:2000 pub_endpoint=tcp://127.0.0.1:3000",file=sys.stderr)
+        print("Example: cauldron prefix=be.apsu.mon pull_endpoint=tcp://127.0.0.1:2000 pub_endpoint=tcp://127.0.0.1:3000 pull_hwm=128 pub_hwm=128 shuttle_size_threshold=32768,shuttle_age_threshold=.1",file=sys.stderr)

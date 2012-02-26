@@ -25,7 +25,7 @@ from threading 	import Thread,Lock
 
 ############################### CAULDRON ############################
 
-class CauldronReceiver:
+class CauldronSubscriber:
     """ subscribe to the Cauldron at a certain endpoint, handler is called with shuttles boiling at that port, as lists of label-value tuples
 	
         pass an endpoint indicating what cauldron to subscribe to,
@@ -39,9 +39,25 @@ class CauldronReceiver:
         self.sub_socket.setsockopt_unicode(zmq.SUBSCRIBE,'')
         self.handler=handler
 
-    def receive_forever(self):
-        while(True):
-            self.handler.shuttle([tuple(line.split('=')) for line in str(self.sub_socket.recv(),'UTF-8').rstrip().split('\n')])
+    def receive_as_bytes_forever(self):
+        while True:
+            self.handler.recv(self.sub_socket.recv())
+
+    def receive_as_strings_forever(self):
+        while True:
+            self.handler.recv(str(self.sub_socket.recv(),'UTF-8').rstrip())
+
+    def receive_as_lines_forever(self):
+        while True:
+            self.handler.recv([line for line in str(self.sub_socket.recv(),'UTF-8').rstrip().split('\n')])
+
+    def receive_as_lists_forever(self):
+        while True:
+            self.handler.recv([line.split('=') for line in str(self.sub_socket.recv(),'UTF-8').rstrip().split('\n')])
+
+    def receive_as_tuples_forever(self):
+        while True:
+            self.handler.recv([tuple(line.split('=')) for line in str(self.sub_socket.recv(),'UTF-8').rstrip().split('\n')])
 
 
 class CauldronSender:
