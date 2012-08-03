@@ -135,7 +135,9 @@ class DirManager(pyinotify.ProcessEvent):
 # -------------------------------------------------------------
 
 if __name__=='__main__':
-    master=DirManager('/opt/extremon/plugins',PrintingDirWatcher(),ignore=[r'^\.',r'\.x?swp$',r'~'])
+    master=DirManager(  '/opt/extremon/plugins',
+                        PrintingDirWatcher(),
+                        ignore=[r'^\.',r'\.x?swp$',r'~'])
     master.start()
     sleep(30)
     master.stop()
