@@ -1,12 +1,11 @@
 #!/usr/bin/python3 
 from dirmanager   import DirManager
-from os           import path
+from os           import path,environ
 from subprocess   import Popen,PIPE
 from threading    import Thread
 from queue        import Queue,Empty
 from extremon     import CauldronReceiver,CauldronSender
 import re,traceback,sys,signal,syslog
-import cProfile
 
 # ------------------------------------------------------------------------
 
@@ -31,6 +30,7 @@ class CauldronToPlugin(Thread):
     self.cauldron=CauldronReceiver(self.cauldronAddr,self)
     while self.running:
       self.cauldron.receive_shuttle()
+    self.plugin.close()
 
   def handle_shuttle(self,shuttle):
     if not self.running:
@@ -47,16 +47,16 @@ class CauldronToPlugin(Thread):
         self.allowCache[label]=allow
       if allow:
         self.buffer.append("%s=%s" % (label,value))
-    self.buffer.append("");
 
-    try:
-      self.plugin.write(bytes('\n'.join(self.buffer),'utf-8'))
-    except IOError:
-      self.running=False
+    if len(self.buffer)>0:
+      self.buffer.extend(['','']);
+      try:
+        self.plugin.write(bytes('\n'.join(self.buffer),'utf-8'))
+      except IOError:
+        self.running=False
 
   def stop(self):
     self.running=False
-    self.plugin.close()
 
 # ------------------------------------------------------------------------
 
@@ -68,6 +68,7 @@ class PluginToCauldron(Thread):
     self.plugin=plugin
     self.allowCache={}
     self.buffer=[]
+    self.outFilterExpr=outFilter
     self.outFilter=re.compile(outFilter)
     self.log=log
 
@@ -75,7 +76,7 @@ class PluginToCauldron(Thread):
     self.running=True
     self.cauldron=CauldronSender(self.cauldronAddr)
     while self.running:
-      data=self.plugin.readline(256)
+      data=self.plugin.readline(8192)
       if len(data)==0:
         self.log("%s: EOF From Plugin" % (self.name))
         self.running=False
@@ -92,12 +93,16 @@ class PluginToCauldron(Thread):
                 self.allowCache[label]=allow
               if allow:
                 self.cauldron.put(label,value)
+              else:
+                self.log("%s: label [%s] does not match filter (%s)" %
+                         (self.name,label,self.outFilterExpr),
+                         syslog.LOG_WARNING)
           except ValueError:
             self.log("%s: Can't Parse [%s]" % (self.name,line))
+    self.plugin.close()
   
   def stop(self):
     self.running=False
-    self.plugin.close()
 
 # ------------------------------------------------------------------------
 
@@ -134,7 +139,8 @@ class Plugin(Thread):
                           bufsize=0,
                           stdin=  PIPE if self.isInput else None,
                           stdout= PIPE if self.isOutput else None,
-                          stderr= PIPE)
+                          stderr= PIPE,
+                          start_new_session=True)
 
       if 'in.filter' in self.config:
         self.c2p=CauldronToPlugin(self.name,self.cauldronAddr,
@@ -164,6 +170,7 @@ class Plugin(Thread):
           self.running=False
     except Exception as ex:
       self.running=False
+      
 
   def stop(self):
     self.log("%s: Asked To Stop" % (self.name))
@@ -178,7 +185,7 @@ class Plugin(Thread):
 
 class Coven(object):
   def __init__( self,path,prefix,cauldronAddr,
-                ignore=[r'^\.',r'\.x?swp$',r'~']):
+                ignore=[r'^\.',r'\.x?swp$',r'~',r'^__',r'__$']):
     syslog.openlog(ident="X3Coven",facility=syslog.LOG_DAEMON)
     self.path=path
     self.prefix=prefix
@@ -224,7 +231,6 @@ class Coven(object):
     try:
       while True:
         (priority,message)=self.logq.get(block=block)
-        print(priority)
         if type(message)==str:
           syslog.syslog(priority,message)
         elif type(message)==list:
@@ -290,5 +296,6 @@ class Coven(object):
 
 if __name__=='__main__':
   signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+  environ['PYTHONPATH']=sys.path[0]
   coven=Coven('/opt/extremon/plugins','be.apsu',('224.0.0.1',1249))
   coven.practice()

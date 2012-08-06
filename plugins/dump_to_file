@@ -1,0 +1,4 @@
+#!/bin/bash
+#x3.in.filter=^be.fedict.eid.prod.trust.app1.load.load.shortterm
+echo $PYTHONPATH >> /tmp/pythonpath
+cat > /tmp/dump
