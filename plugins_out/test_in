@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+#x3.in.filter=^be.fedict.eid.prod.trust.app1
+import sys
+
+with open("/tmp/test_in_dump","w") as dumpfile:
+    while True:
+        line=sys.stdin.readline()
+        if len(line)==1:
+            print(file=dumpfile)
+        elif len(line)==0:
+            sys.stderr.write("found EOF. exiting\n")
+            sys.exit(0)
+        else:
+            print(line.rstrip(),file=dumpfile)

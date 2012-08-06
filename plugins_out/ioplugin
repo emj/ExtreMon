@@ -1,0 +1,17 @@
+import sys
+
+class ioplugin(object):
+  def __init__(self):
+    line=sys.stdin.readline()
+    if len(line)==1:
+        sys.stdout.write('\n')
+    elif len(line)==0:
+        sys.stderr.write("found EOF. exiting\n")
+        sys.exit(0)
+    else:
+        try:
+            (label,value)=line.rstrip().split('=')
+            sys.stdout.write('%s.hhahatralala=%s\n' % (label,value))
+        except ValueError:
+            sys.stderr.write("invalid line %s\n" % (line))
+

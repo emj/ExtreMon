@@ -76,7 +76,7 @@ class PluginToCauldron(Thread):
     self.running=True
     self.cauldron=CauldronSender(self.cauldronAddr)
     while self.running:
-      data=self.plugin.readline(8192)
+      data=self.plugin.readline(16384)
       if len(data)==0:
         self.log("%s: EOF From Plugin" % (self.name))
         self.running=False
@@ -135,8 +135,9 @@ class Plugin(Thread):
     self.log("%s: Starting.." % (self.name),priority=syslog.LOG_INFO)
     self.running=True
     try:
-      self.process=Popen( self.path,
+      self.process=Popen(['x3:%s' % (self.name)],
                           bufsize=0,
+                          executable=self.path,
                           stdin=  PIPE if self.isInput else None,
                           stdout= PIPE if self.isOutput else None,
                           stderr= PIPE,

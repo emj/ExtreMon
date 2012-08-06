@@ -1,0 +1,47 @@
+#!/usr/bin/python3
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+)\.jmx_memory\.(?P<measure>init|committed|used|max)\.value$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.jmx_memory\.(?P<measure>init|committed|used|max)\.percentage$
+import re
+from x3plugin import X3IOC
+#-------------------------------------------------------------------------
+
+class JAVAMEM(X3IOC):
+  def __init__(self):
+    self.regex=re.compile('^(?P<prefix>[a-z0-9._-]+)\\.'
+                          '(init|committed|used|max)\\.'
+                          'value$')
+    self.paramCache={}
+    X3IOC.__init__(self)
+
+  def receive(self,shuttle):
+    for (label,value) in shuttle.items():
+      params=None
+      try:
+        params=self.paramCache[label]
+      except KeyError:
+        matches=self.regex.match(label)
+        if matches:
+          params=matches.groupdict()
+          self.paramCache[label]=params
+        else:
+          self.paramCache[label]=None
+      if params:
+        self.computePercentages(params)
+
+  def computePercentages(self,params):
+    try:
+      prefix=params['prefix']
+      init=float(self.cached['%s.init.value' % (prefix)])
+      committed=float(self.cached['%s.committed.value' % (prefix)])
+      used=float(self.cached['%s.used.value' % (prefix)])
+      max=float(self.cached['%s.max.value' % (prefix)])
+      self.contribute('%s.init.percentage' % (prefix),str((init/max)*100.0))
+      self.contribute('%s.committed.percentage' % (prefix),str((committed/max)*100.0))
+      self.contribute('%s.used.percentage' % (prefix),str((used/max)*100.0))
+      self.contribute('%s.max.percentage' % (prefix),'100.0')
+    except KeyError:
+      self.log("%s not complete yet" % (prefix))
+
+JAVAMEM()
+  
+
