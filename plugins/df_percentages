@@ -1,44 +1,25 @@
 #!/usr/bin/python3
-#x3.in.filter=^([a-z0-9._-]+)\.df_complex\.(free|reserved|used)\.value$
-#x3.out.filter=^([a-z0-9._-]+)\.df_complex\.(free|reserved|used)\.percentage$
-import re
-from x3plugin import X3IOC
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.df_complex)\.(free|reserved|used)\.value$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.df_complex)\.(free|reserved|used)\.percentage$
+from x3plugin import X3IO
 #-------------------------------------------------------------------------
 
-class DF(X3IOC):
+class DF(X3IO):
   def __init__(self):
-    self.regex=re.compile('^(?P<prefix>[a-z0-9._-]+)\\.'
-                          '(?P<measure>free|reserved|used)\\.'
-                          'value$')
-    self.paramCache={}
-    X3IOC.__init__(self)
+    X3IO.__init__(self,cache=True,capture=True)
 
   def receive(self,shuttle):
-    for (label,value) in shuttle.items():
-      params=None
+    for (label,value,captures) in shuttle:
       try:
-        params=self.paramCache[label]
+        prefix=captures['prefix']
+        free=float(self.cached['%s.free.value' % (prefix)])
+        reserved=float(self.cached['%s.reserved.value' % (prefix)])
+        used=float(self.cached['%s.used.value' % (prefix)])
+        total=free+reserved+used
+        self.contribute('%s.free.percentage' % (prefix),str((free/total)*100.0))
+        self.contribute('%s.reserved.percentage' % (prefix),str((reserved/total)*100.0))
+        self.contribute('%s.used.percentage' % (prefix),str((used/total)*100.0))
       except KeyError:
-        matches=self.regex.match(label)
-        if matches:
-          params=matches.groupdict()
-          self.paramCache[label]=params
-        else:
-          self.paramCache[label]=None
-      if params:
-        self.compute_percentages(params)
-
-  def compute_percentages(self,params):
-    try:
-      prefix=params['prefix']
-      free=float(self.cached['%s.free.value' % (prefix)])
-      reserved=float(self.cached['%s.reserved.value' % (prefix)])
-      used=float(self.cached['%s.used.value' % (prefix)])
-      total=free+reserved+used
-      self.contribute('%s.free.percentage' % (prefix),str((free/total)*100.0))
-      self.contribute('%s.reserved.percentage' % (prefix),str((reserved/total)*100.0))
-      self.contribute('%s.used.percentage' % (prefix),str((used/total)*100.0))
-    except KeyError:
-      self.log("%s not complete yet" % (prefix))
+        self.log("%s not complete yet" % (prefix))
 
 DF()

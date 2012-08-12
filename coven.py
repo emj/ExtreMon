@@ -16,7 +16,7 @@ class CauldronToPlugin(Thread):
     self.cauldronAddr=cauldronAddr
     self.plugin=plugin
     self.allowCache={}
-    self.buffer=[]
+    self.accu=set()
     self.inFilter=re.compile(inFilter)
     self.log=log
 
@@ -24,7 +24,7 @@ class CauldronToPlugin(Thread):
       self.outFilter=re.compile(outFilter) 
     else:
       self.outFilter=None
-
+  
   def run(self):
     self.running=True
     self.cauldron=CauldronReceiver(self.cauldronAddr,self)
@@ -35,8 +35,6 @@ class CauldronToPlugin(Thread):
   def handle_shuttle(self,shuttle):
     if not self.running:
       return
-
-    self.buffer=[]
     for (label,value) in shuttle:
       try:
         allow=self.allowCache[label]
@@ -46,12 +44,13 @@ class CauldronToPlugin(Thread):
                 ( self.outFilter.search(label)))))
         self.allowCache[label]=allow
       if allow:
-        self.buffer.append("%s=%s" % (label,value))
+        self.accu.add("%s=%s" % (label,value))
 
-    if len(self.buffer)>0:
-      self.buffer.extend(['','']);
+    if len(self.accu)>0:
       try:
-        self.plugin.write(bytes('\n'.join(self.buffer),'utf-8'))
+        self.plugin.write(bytes('%s\n' %
+                          ('\n\n'.join(self.accu)),'utf-8'))
+        self.accu.clear()
       except IOError:
         self.running=False
 
@@ -75,34 +74,27 @@ class PluginToCauldron(Thread):
   def run(self):
     self.running=True
     self.cauldron=CauldronSender(self.cauldronAddr)
-    while self.running:
-      data=self.plugin.readline(16384)
-      if len(data)==0:
-        self.log("%s: EOF From Plugin" % (self.name))
-        self.running=False
-      else:
-        line=str(data,'utf-8')
-        if len(line)>1:
+    for recordBytes in self.plugin:
+      if len(recordBytes)>1:
+        try:
+          record=str(recordBytes,'UTF-8')
+          (label,value)=record.rstrip().split('=')
           try:
-            (label,value)=line.rstrip().split('=')
-            if label and value:
-              try:
-                allow=self.allowCache[label]
-              except KeyError:
-                allow=(self.outFilter.search(label)!=None)
-                self.allowCache[label]=allow
-              if allow:
-                self.cauldron.put(label,value)
-              else:
-                self.log("%s: label [%s] does not match filter (%s)" %
-                         (self.name,label,self.outFilterExpr),
-                         syslog.LOG_WARNING)
-          except ValueError:
-            self.log("%s: Can't Parse [%s]" % (self.name,line))
-    self.plugin.close()
-  
+            allow=self.allowCache[label]
+          except KeyError:
+            allow=(self.outFilter.search(label)!=None)
+            self.allowCache[label]=allow
+          if allow:
+            self.cauldron.put(label,value)
+          else:
+            self.log("%s: label [%s] does not match filter (%s)" %
+                     (self.name,label,self.outFilterExpr),
+                      syslog.LOG_WARNING)
+        except ValueError:
+              self.log("%s: Can't Parse [%s]" % (self.name,str(record)))
+     
   def stop(self):
-    self.running=False
+    pass
 
 # ------------------------------------------------------------------------
 
@@ -134,6 +126,10 @@ class Plugin(Thread):
   def run(self):
     self.log("%s: Starting.." % (self.name),priority=syslog.LOG_INFO)
     self.running=True
+    newEnvironment=dict(environ)
+    for (label,value) in self.config.items():
+      newEnvironment["X3MON_%s" % (label.upper().replace('.','_'))]=value
+
     try:
       self.process=Popen(['x3:%s' % (self.name)],
                           bufsize=0,
@@ -141,6 +137,7 @@ class Plugin(Thread):
                           stdin=  PIPE if self.isInput else None,
                           stdout= PIPE if self.isOutput else None,
                           stderr= PIPE,
+                          env=newEnvironment,
                           start_new_session=True)
 
       if 'in.filter' in self.config:
@@ -192,7 +189,6 @@ class Coven(object):
     self.prefix=prefix
     self.cauldronAddr=cauldronAddr
     self.plugins={}
-    self.logq=Queue()
     self.confRE=re.compile('^#\\s*x3\.([a-z0-9.]+)\\s*=\\s*(.*)\\s*$')
     self.dirManager=DirManager(self.path,self,ignore=ignore)
     self.cauldron=CauldronSender(self.cauldronAddr)
@@ -226,31 +222,20 @@ class Coven(object):
     return conf
   
   def log(self,message,priority=syslog.LOG_DEBUG):
-    self.logq.put((priority,message))
-
-  def deQueueLogQueue(self,block=True):
-    try:
-      while True:
-        (priority,message)=self.logq.get(block=block)
-        if type(message)==str:
-          syslog.syslog(priority,message)
-        elif type(message)==list:
-          for line in message:
-            syslog.syslog(priority,line)
-        self.logq.task_done()
-    except Empty:
-      pass
+    if type(message)==str:
+      syslog.syslog(priority,message)
+    elif type(message)==list:
+      for line in message:
+        syslog.syslog(priority,line)
 
   def practice(self):
     try:
       self.dirManager.start()
-      self.deQueueLogQueue(block=True)
     except KeyboardInterrupt:
       self.log("Coven stopping..")
       self.dirManager.stop()
       for partingPlugin in self.plugins.values():
         partingPlugin.stop()
-      self.deQueueLogQueue(block=False) 
       self.log("Coven stopped..",priority=syslog.LOG_INFO)
 
 # ------------------------------------------------------------------------
