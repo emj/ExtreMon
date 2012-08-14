@@ -1,0 +1,20 @@
+#!/usr/bin/python3
+#x3.in.filter=^be.fedict.eid.prod.trust
+#x3.out.filter=foo$
+import sys
+
+shuttle=[]
+for line in sys.stdin:
+  if len(line)==1:
+    if len(shuttle)>0:
+      shuttle.append('')
+      print('\n'.join(shuttle))
+      sys.stdout.flush() 
+      del shuttle[:]
+  else:
+    try:
+      (label,value)=line.rstrip().split('=')
+      shuttle.append('%s.foo=%s\n' % (label,value))
+    except ValueError:
+      print("invalid line %s\n" % (line),file=sys.stderr)
+

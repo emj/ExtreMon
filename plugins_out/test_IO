@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+#x3.in.filter=^be.fedict.eid.prod.trust
+#x3.out.filter=bar$
+from x3plugin import X3IO
+#-------------------------------------------------------------------------
+
+class TestIO(X3IO):
+
+  def receive(self,shuttle):
+    for (label,value) in shuttle.items():
+      self.contribute('%s.bar' % (label),value)
+
+TestIO()

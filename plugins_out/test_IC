@@ -1,0 +1,10 @@
+#!/usr/bin/python3
+#x3.in.filter=^be.fedict.eid.prod.trust
+from x3plugin import X3CachingIn
+#-------------------------------------------------------------------------
+
+class TestIC(X3CachingIn):
+  def receive(self,shuttle):
+    self.log("%d records in cache" % (len(self.cache)))
+
+TestIC()

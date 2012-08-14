@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+#x3.in.filter=^be.fedict.eid.prod.trust.app1
+#-------------------------------------------------------------------------
+import sys
+from x3plugin import X3In
+#-------------------------------------------------------------------------
+
+class TestIn(X3In):
+  def receive(self,shuttle):
+    print("shuttle with %d records arrived" % (len(shuttle)),file=sys.stderr)
+
+TestIn()

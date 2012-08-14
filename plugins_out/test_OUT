@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+#x3.out.filter=foo.foo$
+#-------------------------------------------------------------------------
+from time import sleep
+from x3plugin import X3Out
+#-------------------------------------------------------------------------
+
+x3=X3Out()
+while True:
+  x3.contribute("foo.foo.foo.foo.foo","bar")
+  sleep(.05)
+
