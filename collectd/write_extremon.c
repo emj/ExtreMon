@@ -6,9 +6,8 @@
 * collectd - src/write_extremon.c
 * Based on write_http by Sadauskas,MacEachern & Forster
 *
-* This file is part of ExtreMon. All other parts of ExtreMon are licenced under
-* the GPL, version 3. I had to keep this file at version 2, due to this limitation
-* being present in write_http at time of writing - Frank Marien
+* This file is part of ExtreMon, and its only source file licenced
+* under version 2 of the GNU General Public License.
 *
 * This program is free software; you can redistribute it and/or modify it
 * under the terms of the GNU General Public License as published by the
