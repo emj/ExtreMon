@@ -48,11 +48,9 @@
 # include <pthread.h>
 #endif
 
-
 /*
  * Private variables
  */
-
 
 struct we_callback_s
 {
@@ -72,7 +70,7 @@ typedef struct we_callback_s we_callback_t;
 
 
 int format_values_extremon (char *ret, size_t ret_len, 
-                            const data_set_t *ds, const value_list_t *vl, 
+                            const data_set_t *ds, const value_list_t *vl,
                             _Bool store_rates)
 {
   size_t    offset = 0;
@@ -104,7 +102,7 @@ int format_values_extremon (char *ret, size_t ret_len,
 
   for(i=0;i<ds->ds_num;i++)
   {
-    if ((vl->plugin_instance==NULL) || (strlen (vl->plugin_instance)= 0))
+    if((vl->plugin_instance==NULL) || (strlen (vl->plugin_instance)= 0))
     {
       if ((vl->type_instance==NULL) || (strlen(vl->type_instance)==0))
         BUFFER_ADD("%s.%s.%s.",vl->host,vl->plugin,vl->type);
@@ -114,7 +112,7 @@ int format_values_extremon (char *ret, size_t ret_len,
     }
     else
     {
-      if ((vl->type_instance == NULL) || (strlen(vl->type_instance) == 0))
+      if((vl->type_instance == NULL) || (strlen(vl->type_instance) == 0))
         BUFFER_ADD("%s.%s.%s.%s.", vl->host,vl->plugin,
                                    vl->plugin_instance, vl->type);
       else
@@ -123,7 +121,7 @@ int format_values_extremon (char *ret, size_t ret_len,
                                       vl->type_instance);
     }
 
-    if (ds->ds[i].type==DS_TYPE_GAUGE)
+    if(ds->ds[i].type==DS_TYPE_GAUGE)
       BUFFER_ADD ("%s=%f\n", ds->ds[i].name,vl->values[i].gauge);
     else if(store_rates)
     {
@@ -138,7 +136,7 @@ int format_values_extremon (char *ret, size_t ret_len,
 
       BUFFER_ADD ("%s=%g\n", ds->ds[i].name,rates[i]);
     }
-    else if (ds->ds[i].type==DS_TYPE_COUNTER)
+    else if(ds->ds[i].type==DS_TYPE_COUNTER)
       BUFFER_ADD ("%s=%llu\n", ds->ds[i].name,vl->values[i].counter);
   }
 
@@ -172,8 +170,8 @@ static int we_send_buffer(we_callback_t *cb)
                                     (unsigned long long)time.tv_usec);
   values_len=strlen(values);    
 
-  assert (values_len < cb->send_buffer_free);
-  memcpy (cb->send_buffer + cb->send_buffer_fill, values, values_len + 1);
+  assert(values_len < cb->send_buffer_free);
+  memcpy(cb->send_buffer+cb->send_buffer_fill, values, values_len + 1);
   cb->send_buffer_fill += values_len;
   cb->send_buffer_free -= values_len;
 
@@ -404,7 +402,7 @@ static int we_write_command (const data_set_t *ds,
   /* `command_len + 1' because `command_len' does not include the
    * trailing null byte. Neither does `send_buffer_fill'. */
 
-  memcpy (cb->send_buffer + cb->send_buffer_fill, values, values_len + 1);
+  memcpy (cb->send_buffer+cb->send_buffer_fill,values,values_len+1);
   cb->send_buffer_fill += values_len;
   cb->send_buffer_free -= values_len;
 
