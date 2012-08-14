@@ -20,27 +20,39 @@
 #
 
 import time,socket, struct
-from queue 		import Queue
+from queue 			import Queue
 from threading 	import Thread,Lock
 
-############################### CAULDRON ############################
+############################### CAULDRON ################################
 
 class CauldronReceiver:
-	""" subscribe to the multicast Cauldron at a certain port, handler is called with shuttles boiling at that port.
+
+	""" subscribe to the multicast Cauldron at a certain port, handler is 
+		called with shuttles boiling at that port.
 	
-		pass an (address,port) tuple indicating what mcast group/port you want to subscribe to,
-		and a handler instance, which should implement a handle_shuttle(self, set) method,
-		then call receive_forever (which blocks): your handle_shuttle method will be called
-		with a set of (label,value) tuples for each shuttle that boils at the group/port you gave.
+		pass an (address,port) tuple indicating what mcast group/port you 
+		want to subscribe to, and a handler instance, which should 
+		implement a handle_shuttle(self, set) method, then call 
+		receive_forever (which blocks): your handle_shuttle method will be 
+		called with a set of (label,value) tuples for each shuttle that 
+		boils at the group/port you gave.
 	"""
+
 	def __init__(self,mcast_addr,handler):
 		(mcast_group,mcast_port)=mcast_addr
 		self.handler=handler
-		self.socket=socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+		self.socket=socket.socket(	socket.AF_INET,
+																socket.SOCK_DGRAM,
+																socket.IPPROTO_UDP)
 		self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.socket.bind(('', mcast_port))
-		self.socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, struct.pack("4sl", socket.inet_aton(mcast_group), socket.INADDR_ANY))
+		self.socket.setsockopt(	socket.IPPROTO_IP,
+														socket.IP_ADD_MEMBERSHIP,
+														struct.pack("4sl",
+														socket.inet_aton(mcast_group),
+														socket.INADDR_ANY))
 		self.shuttle=set()
+
 
 	def receive_shuttle(self):
 		data=self.socket.recv(16384)
@@ -52,40 +64,53 @@ class CauldronReceiver:
 		self.handler.handle_shuttle(set(self.shuttle))
 		self.shuttle.clear()
 
+
 	def receive_forever(self):
 		while True:
 			self.receive_shuttle()
 
 
 class CauldronSender:
-	""" contribute to the multicast Cauldron at a certain port, adding values.
+
+	""" contribute to the multicast Cauldron at a certain port, adding
+		values.
 	
-		pass an (address,port) tuple indicating what mcast group/port you want to contribute to,
-		call put(label,value) to contribute. the CauldronSender will accumulate values until either
-		max_shuttle_size are ready to send, or max_shuttle_age seconds have passed.
+		pass an (address,port) tuple indicating what mcast group/port you
+		want to contribute to, call put(label,value) to contribute. the 
+		CauldronSender will accumulate values until either max_shuttle_size
+		are ready to send, or max_shuttle_age seconds have passed.
 		
-		WARNING: CauldronSender assumes a minimal boiling level where values are presented
-		         at least every max_shuttle_age seconds: If e.g. you present one value,
-		         and then none for minutes, that one value will not be contributed for
-		         minutes even if max_shuttle_age is far lower than that.
+		WARNING: CauldronSender assumes a minimal boiling level where 
+		values are presented at least every max_shuttle_age seconds: 
+		If e.g. you present one value, and then none for minutes, that one 
+		value will not be contributed for minutes even if max_shuttle_age 
+		is far lower than that.
 	"""
+
 	def __init__(self,mcast_addr,max_shuttle_size=512,max_shuttle_age=.5):
 		self.mcast_addr=mcast_addr
-		self.sock=socket.socket(socket.AF_INET,socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+		self.sock=socket.socket(	socket.AF_INET,
+															socket.SOCK_DGRAM,
+															socket.IPPROTO_UDP)
 		self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL,1)
 		self.max_shuttle_size=max_shuttle_size
 		self.max_shuttle_age=max_shuttle_age
 		self.shuttle=set()
 		self.clear_shuttle()
 
+
 	def put(self,label,value):
 		_value=str(value)
 		if '=' in _value:
-			raise ValueError('"=" Is An Illegal Value In ExtreMon Labels And Values')
+			raise ValueError(	'"=" Is An Illegal Value In ExtreMon '
+												'Labels And Values')
 		self.shuttle.add('%s=%s' % (label,_value))
-		if len(self.shuttle)>=self.max_shuttle_size or time.time()>=(self.shuttle_age+self.max_shuttle_age):
-			self.sock.sendto(bytes('%s\n\n' % ('\n'.join(self.shuttle)),'UTF-8'),self.mcast_addr)
+		if (len(self.shuttle)>=self.max_shuttle_size or 
+		time.time()>=(self.shuttle_age+self.max_shuttle_age)):
+			self.sock.sendto(	bytes('%s\n\n' % ('\n'.join(self.shuttle)),
+												'UTF-8'),self.mcast_addr)
 			self.clear_shuttle()
+
 
 	def clear_shuttle(self):
 		self.shuttle.clear()
@@ -93,25 +118,34 @@ class CauldronSender:
 
 
 class CauldronLabelFilter:
-	""" Base class for filtering the labels of label-value pairs boiling, *between* ports in a boiling cauldron.
-	
-		Pass two (address,port) tuples indicating the mcast group/port to listen for values, and the mcast group/port
-		to write filtered values to, call filter_forever (blocks).
-	
-		Subclasses should implement the filter_label() method which takes a label and returns a label, after whatever
-		filtering it applies. Note that the subclasses' filter_label method is only called once per unique label,
-		as the CauldronLabelFilter will cache the result and use the cached label without calling the filter_label again.
-	"""
-	def __init__(self,in_addr,out_addr,max_shuttle_size=128,max_shuttle_age=.1):
-		self.receiver=CauldronReceiver(mcast_addr=in_addr,handler=self)
-		self.sender=CauldronSender(mcast_addr=out_addr,max_shuttle_size=max_shuttle_size,max_shuttle_age=max_shuttle_age)
-		self.cache={}
 
-	def filter_shuttle(self):
+	""" Base class for filtering the labels of label-value pairs boiling, 
+		*between* ports in a boiling cauldron.
+	
+		Pass two (address,port) tuples indicating the mcast group/port to 
+		listen for values, and the mcast group/port to write filtered 
+		values to, call filter_forever (blocks).
+	
+		Subclasses should implement the filter_label() method which takes a 
+		label and returns a label, after whatever filtering it applies.
+		Note that the subclasses' filter_label method is only called once
+		per unique label, as the CauldronLabelFilter will cache the result
+		and use the cached label without calling the filter_label again.
+	"""
+	
+	def __init__(	self,in_addr,out_addr,max_shuttle_size=128,
+								max_shuttle_age=.1):
+		self.receiver=CauldronReceiver(mcast_addr=in_addr,handler=self)
+		self.sender=CauldronSender(	mcast_addr=out_addr,
+																max_shuttle_size=max_shuttle_size,
+																max_shuttle_age=max_shuttle_age)
+		self.cache={}
 		self.receiver.receive_shuttle()
+
 		
 	def filter_forever(self):
 		self.receiver.receive_forever()
+
 
 	def handle_shuttle(self,shuttle):
 		for (old_label,value) in shuttle:
@@ -123,21 +157,32 @@ class CauldronLabelFilter:
 			self.sender.put(label,value)
 
 	def filter_label(self,label):
-		raise NotImplementedError("Subclasses of CauldronLabelFilter should implement a filter_label method")
+		raise NotImplementedError(	"Subclasses of CauldronLabelFilter "
+																"should implement a filter_label "
+																"method")
 
 
 class CauldronContributor:
-	""" Base class for contributing values to a boiling cauldron, based on values already boiling
+
+	""" Base class for contributing values to a boiling cauldron, based on 
+		values already boiling
 	
-	Pass an (address,port) tuple indicating the mcast group/port to contribute to, and a suffix to be added
-	to the label of the existing value you want to contribute to, to form your own label, call contribute_forever (blocks).
+		Pass an (address,port) tuple indicating the mcast group/port to 
+		contribute to, and a suffix to be added to the label of the
+		existing value you want to contribute to, to form your own label,
+		call contribute_forever (blocks).
 	
-	Subclasses should implement the contribute(self,label,value) method, and call one of the put_ methods
-	to contribute.
+		Subclasses should implement the contribute(label,value)
+		method, and call one of the put_ methods to contribute.
 	"""
-	def __init__(self,mcast_addr,suffix=None,max_shuttle_size=128,max_shuttle_age=.1):
+
+	def __init__(	self,mcast_addr,suffix=None,
+								max_shuttle_size=128,
+								max_shuttle_age=.1):
 		self.receiver=CauldronReceiver(mcast_addr=mcast_addr,handler=self)
-		self.sender=CauldronSender(mcast_addr=mcast_addr,max_shuttle_size=max_shuttle_size,max_shuttle_age=max_shuttle_age)
+		self.sender=CauldronSender(	mcast_addr=mcast_addr,
+																max_shuttle_size=max_shuttle_size,
+																max_shuttle_age=max_shuttle_age)
 		self.suffix=suffix
 		self.values={}
 		if self.suffix:
@@ -147,11 +192,14 @@ class CauldronContributor:
 			self.handle_shuttle=self.handle_shuttle_without_suffix
 			self.put=self.put_without_suffix
 
+
 	def contribute_shuttle(self):
 		self.receiver.receive_shuttle()
 
+
 	def contribute_forever(self):
 		self.receiver.receive_forever()
+
 
 	def handle_shuttle_with_suffix(self,shuttle):
 		for (label,value) in shuttle:
@@ -164,6 +212,7 @@ class CauldronContributor:
 					self.values[label]=value
 				self.contribute(label,value)
 
+
 	def handle_shuttle_without_suffix(self,shuttle):
 		for (label,value) in shuttle:
 			try:
@@ -173,17 +222,24 @@ class CauldronContributor:
 				self.values[label]=value
 			self.contribute(label,value)
 
+
 	def contribute(self,label,value):
-		raise NotImplementedError("Subclasses of CauldronContributor should implement a contribute method")
+		raise NotImplementedError(	"Subclasses of CauldronContributor "
+																"should implement a contribute method")
+
 
 	def put_with_suffix(self,label,value,sub=None):
 		if sub:
-			self.sender.put('%s.%s.%s' % (label,self.suffix,'.'.join(sub)),value)
+			self.sender.put('%s.%s.%s' % (	label,
+											self.suffix,'.'.join(sub)),
+											value)
 		else:
 			self.sender.put('%s.%s' % (label,self.suffix),value)
 
+
 	def put_without_suffix(self,label,value):
 		self.sender.put(label,value)
+
 
 	def put_with_comment(self,label,state,comment):
 		self.put(label=label,value=state)
@@ -194,15 +250,17 @@ class CauldronContributor:
 class CauldronServer(Thread):
 	""" Base class for streaming servers that serve full boiling cauldrons.
 	
-		values that are presented via the write method are asynchronously copied to all consumers registered
-		by calling the consumer's write methods. adding and removing consumers, and writing are thread-safe.
-		CauldronServer adds a sequence number and timestamp to shuttles being distributed, allowing clients
-		to determine time lag and lost shuttles
+		values that are presented via the write method are asynchronously 
+		copied to all consumers registered by calling the consumer's write 
+		methods. adding and removing consumers, and writing are 
+		thread-safe.  CauldronServer adds a sequence number and timestamp
+		to shuttles being distributed, allowing clients to determine time
+		lag and lost shuttles.
 		
 		CauldronServers are Threads, and must be start()ed.
 		
-		CauldronServers are intended to be Mixed with e.g. TCPServers, HTTPServers, etc..
-		there are examples in the servers/ directory  
+		CauldronServers are intended to be Mixed with e.g. TCPServers,
+		HTTPServers, etc..  there are examples in the servers/ directory
 	"""
 	
 	def __init__(self,prefix):
@@ -237,7 +295,8 @@ class CauldronServer(Thread):
 	def scatter_shuttle(self):
 		with self.consumers_lock:
 			for consumer in self.consumers:
-				consumer.write(bytes('%s\n\n' % ('\n'.join(self.shuttle)),'UTF-8'))
+				consumer.write(		bytes('%s\n\n' % ('\n'.join(self.shuttle)),
+												 'UTF-8'))
 			self.sequence+=1
 
 	def add_consumer(self,consumer):
@@ -255,20 +314,24 @@ class CauldronServer(Thread):
 ############################### CHALICE ############################		
 		
 class ChaliceServer(CauldronServer):
-	""" Base class for streaming servers that serve one full cauldron, then chalices of change
+	""" Base class for streaming servers that serve one full cauldron, then 
+		chalices of change
 	
-		This is basically a CauldronServer with a cache that distinguishes repeat values from changes.
-		The entire cauldron is sent, in shuttles all having an *.iscachedump=1 indicator,
-		then only changing values and new labels are sent. A new label appearing in chalices of change will be sent alongside
-		an indicator of *.label.isnew=1
+		This is basically a CauldronServer with a cache that distinguishes 
+		repeat values from changes.  The entire cauldron is sent, in 
+		shuttles all having an *.iscachedump=1 indicator, then only 
+		changing values and new labels are sent. A new label appearing in
+		chalices of changes will be sent alongside an indicator of 
+		*.label.isnew=1
 		
-		ChaliceServers are intended to be Mixed with e.g. TCPServers, HTTPServers, etc..
-		there are examples in the servers/ directory
+		ChaliceServers are intended to be Mixed with e.g. TCPServers, 
+		HTTPServers, etc..  there are examples in the servers/ directory
 	"""
 	
 	def dump_cache(self,consumer):
 		with self.cache_lock:
-			consumer.write(bytes('%s\n' % ('\n'.join(['%s=%s' % (label,value) for (label,value) in self.cache.items()])),'UTF-8'))
+			consumer.write(bytes('%s\n' % ('\n'.join(['%s=%s' % (label,value)
+						 for (label,value) in self.cache.items()])),'UTF-8'))
 
 	def __init__(self,prefix):
 		CauldronServer.__init__(self,prefix)
