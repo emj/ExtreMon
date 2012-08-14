@@ -17,7 +17,7 @@
 #
 #   You should have received a copy of the GNU General Public License
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
-#
+# 
 
 import time,socket, struct
 from queue      import Queue
