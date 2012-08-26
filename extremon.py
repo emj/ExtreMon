@@ -17,13 +17,118 @@
 #
 #   You should have received a copy of the GNU General Public License
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
-# 
+#
 
-import time,socket, struct,sys
-from queue      import Queue
-from threading  import Thread,Lock
+import sys
+if sys.version_info.major==2:
+  if sys.version_info.minor<7:
+    sys.stderr.write("ExtreMon Requires Python >=2.7")
+    sys.exit(1)
+  pver=2
+else:
+  pver=3
+
+import time,socket, struct
+from numbers import Number
+from threading import Thread,Lock
+if pver==3:
+  from queue import Queue,Empty
+else:
+  from Queue import Queue,Empty
+
 
 ############################### CAULDRON ################################
+
+''' base for classes that contribute shuttles
+    allows label-value pairs (pairs with same label replaces previous)
+    to be gathered into a shuttle, which is sent by launcher()
+    when max_shuttle_size or max_shuttle_age is reached '''
+
+class Loom(Thread):
+  def __init__( self,launcher=None,
+                max_shuttle_size=128,
+                max_shuttle_age=.5):
+    Thread.__init__(self)
+    self.daemon=True
+    self.launcher=launcher if launcher!=None else self._default_launcher
+    self.max_shuttle_size=max_shuttle_size
+    self.max_shuttle_age=max_shuttle_age
+    self._launch=self._launch_p3 if pver==3 else self._launch_p2
+    self.inqueue=Queue()
+    self.shuttle=dict()
+    self.next_deadline=time.time()+max_shuttle_age
+
+# call start() inherited from Thread to start treating shuttles
+# call stop() to stop treating shuttles
+
+  def stop(self):
+    self.inqueue.put(('None',None)) # "poison" the queue
+    self.inqueue.join()             # wait until all records handled
+
+# call put(label,value) for any data to contribute
+
+  def put(self,label,_value):
+    if isinstance(_value, Number):
+      value=str(_value)
+    else:
+      value=_value
+    if '=' in label or '\n' in label or '=' in value or '\n' in value:
+      raise ValueError('"=" and "\\n" Are Illegal '
+                       'in X3Mon Labels And Values')
+    self.inqueue.put((label,value))
+
+# default launcher writes shuttle to stdout
+  def _default_launcher(shuttle):
+    sys.stdout.write(shuttle)
+
+# internal launch (python3). don't call directly
+  def _launch_p3(self,shuttle): 
+    self.launcher('%s\n' % ('\n'.join(['%s=%s' % (label,value) 
+                            for (label,value) in shuttle.items()])))
+
+# internal launch (python2). don't call directly
+  def _launch_p2(self,shuttle): 
+    self.launcher('%s\n' % ('\n'.join(['%s=%s' % (label,value) 
+                            for (label,value) in shuttle.items()])).encode('utf-8'))
+
+# launch using python2 or 3 launcher
+  def launch_and_clear(self,shuttle):
+    self._launch(shuttle)
+    self.shuttle.clear()
+    self._reset()
+    
+# reset deadline
+  def _reset(self): 
+    self.next_deadline=time.time()+self.max_shuttle_age
+
+# main dequeuer loop
+  def run(self):
+    lazy=False
+    ending=False
+    while True:
+      try:    # if we're empty, don't bother to wake up until we aren't
+        timeout=(None if lazy else self.max_shuttle_age)
+        (label,value)=self.inqueue.get(block=True, timeout=timeout)
+        if value==None:   # poison value indicated stop() was called
+          self.inqueue.task_done()
+          ending=True     # signal ending
+          lazy=False      # and make sure we don't block
+        else:
+          if lazy:            # if we're just awakened
+            self._reset()     # reset deadline to avoid sending 1 record
+          self.shuttle[label]=value   # store unqueued value
+          self.inqueue.task_done()    # keep tally for join()
+          lazy=False                  # not empty, block only for max_age
+          if (len(self.shuttle)>=self.max_shuttle_size or 
+             time.time()>=self.next_deadline):  # launch if old or full
+            self.launch_and_clear(self.shuttle)
+      except Empty:                             # if empty
+        if (len(self.shuttle)>0 and             # launch if old and 
+            time.time()>=self.next_deadline):   # something to launch
+          self.launch_and_clear(self.shuttle)
+        if ending:                              # if stop() called
+          return                                # run() ends
+        lazy=True  # otherwise (normal empty), we may now block > max_age
 
 class CauldronReceiver:
 
@@ -70,7 +175,7 @@ class CauldronReceiver:
       self.receive_shuttle()
 
 
-class CauldronSender:
+class CauldronSender(Loom):
 
   """ contribute to the multicast Cauldron at a certain port, adding
     values.
@@ -79,43 +184,21 @@ class CauldronSender:
     want to contribute to, call put(label,value) to contribute. the 
     CauldronSender will accumulate values until either max_shuttle_size
     are ready to send, or max_shuttle_age seconds have passed.
-    
-    WARNING: CauldronSender assumes a minimal boiling level where 
-    values are presented at least every max_shuttle_age seconds: 
-    If e.g. you present one value, and then none for minutes, that one 
-    value will not be contributed for minutes even if max_shuttle_age 
-    is far lower than that.
   """
 
-  def __init__(self,mcast_addr,max_shuttle_size=512,max_shuttle_age=.5):
+  def __init__(self,mcast_addr,max_shuttle_size=128,max_shuttle_age=.5):
     self.mcast_addr=mcast_addr
     self.sock=socket.socket(  socket.AF_INET,
                               socket.SOCK_DGRAM,
                               socket.IPPROTO_UDP)
     self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL,1)
-    self.max_shuttle_size=max_shuttle_size
-    self.max_shuttle_age=max_shuttle_age
-    self.shuttle=set()
-    self.clear_shuttle()
+    Loom.__init__(self,launcher=self.launch,
+                  max_shuttle_size=max_shuttle_size,
+                  max_shuttle_age=max_shuttle_age)
+    self.start()
 
-
-  def put(self,label,value):
-    _value=str(value)
-    if '=' in _value:
-      raise ValueError( '"=" Is An Illegal Value In ExtreMon '
-                        'Labels And Values')
-    self.shuttle.add('%s=%s' % (label,_value))
-    if (len(self.shuttle)>=self.max_shuttle_size or 
-    time.time()>=(self.shuttle_age+self.max_shuttle_age)):
-      self.sock.sendto( bytes('%s\n\n' % ('\n'.join(self.shuttle)),
-                        'UTF-8'),self.mcast_addr)
-      self.clear_shuttle()
-
-
-  def clear_shuttle(self):
-    self.shuttle.clear()
-    self.shuttle_age=time.time()
-
+  def launch(self,shuttle):
+      self.sock.sendto(bytes(shuttle,'utf-8'),self.mcast_addr)
 
 class CauldronLabelFilter:
 
@@ -268,4 +351,5 @@ class ChaliceServer(CauldronServer):
   def add_consumer(self,consumer):
     self.dump_cache(consumer)
     CauldronServer.add_consumer(self,consumer)
+
 

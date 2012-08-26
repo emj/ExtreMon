@@ -16,10 +16,9 @@ class DF(X3IO):
         reserved=float(self.cached['%s.reserved.value' % (prefix)])
         used=float(self.cached['%s.used.value' % (prefix)])
         total=free+reserved+used
-        self.contribute('%s.free.percentage' % (prefix),str((free/total)*100.0))
-        self.contribute('%s.reserved.percentage' % (prefix),str((reserved/total)*100.0))
-        self.contribute('%s.used.percentage' % (prefix),str((used/total)*100.0))
+        self.put('%s.free.percentage' % (prefix),str((free/total)*100.0))
+        self.put('%s.reserved.percentage' % (prefix),str((reserved/total)*100.0))
+        self.put('%s.used.percentage' % (prefix),str((used/total)*100.0))
       except KeyError:
         self.log("%s not complete yet" % (prefix))
-
 DF()

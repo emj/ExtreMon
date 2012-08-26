@@ -91,7 +91,11 @@ class PluginToCauldron(Thread):
                      (self.name,label,self.outFilterExpr),
                       syslog.LOG_WARNING)
         except ValueError:
-              self.log("%s: Can't Parse [%s]" % (self.name,str(record)))
+          self.log("%s: Can't Parse [%s] [%s]" % (
+              self.name,
+              str(recordBytes,'utf-8').rstrip(),
+              ''.join(['%02x' % (thebyte) for thebyte in recordBytes])))
+
      
   def stop(self):
     pass
@@ -130,49 +134,42 @@ class Plugin(Thread):
     for (label,value) in self.config.items():
       newEnvironment["X3MON_%s" % (label.upper().replace('.','_'))]=value
 
-    try:
-      self.process=Popen(['x3:%s' % (self.name)],
-                          bufsize=0,
-                          executable=self.path,
-                          stdin=  PIPE if self.isInput else None,
-                          stdout= PIPE if self.isOutput else None,
-                          stderr= PIPE,
-                          env=newEnvironment,
-                          start_new_session=True)
+    self.process=Popen(['x3:%s' % (self.name)],
+                        bufsize=0,
+                        executable=self.path,
+                        stdin=  PIPE if self.isInput else None,
+                        stdout= PIPE if self.isOutput else None,
+                        stderr= PIPE,
+                        env=newEnvironment,
+                        start_new_session=True)
 
-      if 'in.filter' in self.config:
-        self.c2p=CauldronToPlugin(self.name,self.cauldronAddr,
-                                 self.process.stdin,
-                                 inFilter=self.config.get('in.filter'),
-                                 log=self.log,
-                                 outFilter=self.config.get('out.filter'))
-        self.c2p.start()
+    ''' if input plugin, connect C2P thread to handle stdin '''    
+    if 'in.filter' in self.config:
+      self.c2p=CauldronToPlugin(self.name,self.cauldronAddr,
+                               self.process.stdin,
+                               inFilter=self.config.get('in.filter'),
+                               log=self.log,
+                               outFilter=self.config.get('out.filter'))
+      self.c2p.start()
 
-      if 'out.filter' in self.config:
-        self.p2c=PluginToCauldron(self.name,self.cauldronAddr,
-                                 self.process.stdout,
-                                 log=self.log,
-                                 outFilter=self.config.get('out.filter'))
-        self.p2c.start()
+    ''' if output plugin, connect P2C thread to handle stdout '''
+    if 'out.filter' in self.config:
+      self.p2c=PluginToCauldron(self.name,self.cauldronAddr,
+                               self.process.stdout,
+                               log=self.log,
+                               outFilter=self.config.get('out.filter'))
+    self.p2c.start()
 
-      while self.running:
-        data=self.process.stderr.read()
-        if len(data)>0:
-          lines=['%s reports:' % (self.name)]
-          for error_line in str(data,'UTF-8').split('\n'):
-            lines.append(" | %s" % (error_line))
-          lines.append("")
-          self.log(lines)
-        else:
-          self.log("%s: EOF On stderr" % (self.name))
-          self.running=False
-    except Exception as ex:
-      self.running=False
-      
+    ''' in this thread, read stderr, and log output '''
+    for line in self.process.stderr:
+      self.log("%s | %s" % (self.name,str(line.rstrip(),'utf-8')))
+    self.log("%s: EOF on stderr" % (self.name))
+
+    # reaching here implies self.process.stderr is EOF
+    # this ends run()
 
   def stop(self):
     self.log("%s: Asked To Stop" % (self.name))
-    self.running=False
     if self.p2c:
       self.p2c.stop()
     if self.c2p:

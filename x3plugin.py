@@ -1,5 +1,13 @@
-#!/usr/bin/python3
-import sys,time,os,re
+import sys
+if sys.version_info.major==2:
+  if sys.version_info.minor<7:
+    sys.stderr.write("ExtreMon Requires Python >=2.7")
+    sys.exit(1)
+  pver=2
+else:
+  pver=3
+import time,os,re
+from extremon import Loom
 
 class X3Conf(object):
   def __init__(self):
@@ -10,11 +18,12 @@ class X3Conf(object):
 
 class X3Log(object):
   def log(self,message):
-    print(message,file=sys.stderr)
+    sys.stderr.write('%s\n' % (message))
     sys.stderr.flush()
 
 class X3In(X3Log,X3Conf):
   def __init__(self,cache=False,capture=False):
+    X3Log.__init__(self)
     X3Conf.__init__(self)
     inshuttle={}
     if cache:
@@ -39,7 +48,7 @@ class X3In(X3Log,X3Conf):
                     self.captures[label]=None
               self.receive((label,value,self.captures[label]) for (label,value) in inshuttle.items())
             else:
-              self.receive(inshuttle)
+              self.receive((label,value) for (label,value) in inshuttle.items())
           inshuttle.clear()
         else:
           try:
@@ -54,27 +63,20 @@ class X3In(X3Log,X3Conf):
     raise TypeError("X3 Plugins Should Implement the "
                     "receive(self,shuttle) method")
 
-class X3Out(X3Log,X3Conf):
-  def __init__(self,max_shuttle_size=512,max_shuttle_age=.5):
+class X3Out(Loom,X3Log,X3Conf):
+  def __init__(self,max_shuttle_size=128,max_shuttle_age=.5):
+    X3Log.__init__(self)
     X3Conf.__init__(self)
-    self.max_shuttle_size=max_shuttle_size                            
-    self.max_shuttle_age=max_shuttle_age
-    self.outshuttle=set()
-    self.outshuttle_age=time.time()
+    Loom.__init__(self,launcher=self.launch,max_shuttle_size=max_shuttle_size, max_shuttle_age=max_shuttle_age)
+    self.start()
 
-  def contribute(self,label,_value):
-    value=str(_value)
-    if '=' in label or '=' in value:
-      raise ValueError('"=" Is Illegal in X3Mon Labels And Values')
-    self.outshuttle.add('%s=%s' % (label,value))
-    if len(self.outshuttle)>=self.max_shuttle_size or \
-       time.time()>=(self.outshuttle_age+self.max_shuttle_age):
-      try:
-        print('%s\n' % ('\n'.join(self.outshuttle)))
-        sys.stdout.flush()
-      except IOError:
-        sys.exit(0)
-      self.outshuttle.clear()
+  def launch(self,shuttle):
+    try:
+      sys.stdout.write(shuttle)
+      sys.stdout.flush()
+    except IOError:
+      self.log("IOError writing to stdout.. exiting")
+      sys.exit(0)
 
 class X3IO(X3In,X3Out):
   def __init__(self,cache=False,capture=False,max_shuttle_size=512,max_shuttle_age=.5):
