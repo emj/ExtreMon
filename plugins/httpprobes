@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+#x3.prefix=be.fedict.eid
+#x3.timeout=10.0
+#x3.interval=1.0
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.httpprobe)\.(result|responsetime)$
+import socket
+socket.setdefaulttimeout(10)
+import urllib.request,time,datetime,sys,os,socket,json
+from threading import Thread
+from queue import Queue
+from x3plugin import X3Out
+#------------------------------------------------------------------------
+
+
+# thanks to Carles Barrobes
+# http://stackoverflow.com/questions/110498/
+# is-there-an-easy-way-to-request-a-url-in-python-and-not-follow
+# -redirects/110808
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+  def http_error_302(self, req, fp, code, msg, headers):
+    infourl = urllib.request.addinfourl(fp, headers, req.get_full_url())
+    infourl.status = code
+    infourl.code = code
+    return infourl
+  http_error_300=http_error_302
+  http_error_301=http_error_302
+  http_error_303=http_error_302
+  http_error_307=http_error_302
+
+class ResponseTimeProbe(Thread):
+  def __init__(self,id,patient,interval,timeout,handler,prefix):
+    Thread.__init__(self,name='ReponseTimeProbe [%s]' %(id))
+    self.daemon=True
+    self.id=id
+    self.config=patient
+    self.interval=interval
+    self.timeout=timeout
+    self.handler=handler
+    urllib.request.install_opener(
+                        urllib.request.build_opener(NoRedirectHandler()))
+
+  def run(self):
+    self.running=True
+    while self.running:
+      start=time.time()
+      try:
+        socket=urllib.request.urlopen(self.config['url'],
+                                                    timeout=self.timeout)
+        data=socket.read()
+        success=(data.find(self.config['expect_text'])!=-1 
+                              if 'expect_text' in self.config else True)
+
+      except urllib.error.HTTPError as response:
+        success=(response.code==self.config['expected_code'] 
+                            if 'expected_code' in self.config else False)
+      except:
+        success=False
+      self.handler.put("%s.%s.httpprobe.responsetime" % (
+                                            self.handler.prefix,
+                                            self.id),
+                                            (time.time()-start)*1000.0)
+
+      self.handler.put("%s.%s.httpprobe.result" % (self.handler.prefix,
+                                                   self.id),
+                                                '1' if success else '0')
+      time.sleep(self.interval)
+
+  def stop(self):
+    self.running=False
+      
+class ResponseTimeProbes(X3Out):
+  def __init__(self,patients):
+    X3Out.__init__(self)
+    self.patients=patients
+    self.interval=float(self.config['interval'])
+    self.timeout=float(self.config['timeout'])
+    self.prefix=self.config['prefix']
+
+    for (id,patient) in self.patients.items():
+      try:
+        interval=patient['interval']
+      except KeyError:
+        interval=self.interval
+
+      ResponseTimeProbe(id=id,
+                        patient=patient,
+                        interval=interval,
+                        timeout=self.timeout,
+                        prefix=self.prefix,
+                        handler=self).start()
+    while True:
+      time.sleep(10)
+
+if __name__=='__main__':
+  with open('/etc/x3_httpprobes.conf','r') as confFile:
+    patients=json.load(confFile)
+  ResponseTimeProbes(patients=patients)
