@@ -1,0 +1,98 @@
+#!/usr/bin/python2
+#x3.prefix=com.twitter.tweet
+#x3.out.filter=^com\.twitter\.tweet\.([a-zA-z0-9]+)\.([0-9]+)\.(text|screen_name|name|profile_image_url)$
+import socket
+socket._fileobject.default_bufsize = 1
+import oauth2 as oauth
+import time,urllib2,json,sys,ConfigParser,os
+from x3plugin import X3Out
+#------------------------------------------------------------------------
+
+class TwitterOut(X3Out):
+  def __init__(self):
+    self.log("running")
+    X3Out.__init__(self)
+    tconf=ConfigParser.RawConfigParser()
+    tconf.read(['/etc/x3_twitter.conf', os.path.expanduser('~/.x3_twitter.conf')])
+    self.url = "https://stream.twitter.com/1/statuses/filter.json"
+
+    self.params = { 'oauth_version': "1.0",
+                    'oauth_nonce': oauth.generate_nonce(),
+                    'oauth_timestamp': int(time.time()),
+                    'follow': ','.join(
+                self.getIDs(tconf.get("target","follow").split(','))) }
+
+    self.token=oauth.Token( key=tconf.get("token","key"),
+                            secret=tconf.get("token","secret"))
+    self.consumer=oauth.Consumer( key=tconf.get("consumer","key"),
+                                  secret=tconf.get("consumer","secret"))
+
+    self.params['oauth_token']=self.token.key
+    self.params['oauth_consumer_key']=self.consumer.key
+
+    self.req=oauth.Request(method="GET",url=self.url,
+                           parameters=self.params)
+
+    self.signature_method=oauth.SignatureMethod_HMAC_SHA1()
+    self.req.sign_request(self.signature_method,
+                          self.consumer, self.token)
+
+    try:
+      stream=urllib2.urlopen(self.req.to_url())
+      self.log("connected to stream")
+      for line in stream:
+        if len(line)>2:
+          try:
+            record=json.loads(line.rstrip().decode('utf-8'))
+            try:
+              if 'text' in record and not record['retweeted']:
+                user=record['user']
+                screen_name=self.cleanup(user['screen_name'])
+                name=self.cleanup(user['name'])
+                tweet_id=record['id_str']
+                prefix='%s.%s.%s' % ( self.config['prefix'],
+                                      screen_name,tweet_id)
+                text=self.cleanup(record['text'])
+                self.put('%s.text' % (prefix),text)
+                self.put('%s.name' % (prefix),name)
+                self.put('%s.screen_name' % (prefix),screen_name)
+                if not user['default_profile_image']:
+                  self.put('%s.profile_image_url' % (prefix),
+                           self.cleanup(user['profile_image_url']))
+            except KeyError, e:
+              self.log("Missing Items In Tweet JSON [%s]" %
+                     json.dumps(line.rstrip().decode('utf-8'),indent=2))
+          except ValueError, valueError:
+            self.log("JSON Error: %s on line [%s]" % (valueError,line))
+    except urllib2.HTTPError,e:
+      self.log(e.msg) 
+
+  def cleanup(self,text):
+    return text.replace('=',':').replace('\n',' ')
+
+  def getIDs(self,screenNames):                                                  
+    try:                                                                    
+      stream=urllib2.urlopen("https://api.twitter.com/1/users/"             
+                             "lookup.json?screen_name=%s"                             
+                             "&include_entities=false" %
+                                               (','.join(screenNames)))     
+      return [profile['id_str'] for profile in json.load(stream)]
+    except urllib2.HTTPError,e:
+      self.log(e.msg)
+
+TwitterOut()
+
+''' example x3_twitter.conf
+
+[token]
+key=;lcsguiosucgoipugpcogudpsfoicgdsupcgodisfujcg9
+secret=ksjcgyroeuihlgfjoisjkdsocgudsnhygocuidjghdkhj
+
+[consumer]
+key=fsjkclgkjhgodsgj
+secret=zdkmhcxfjlkhflcgkjzhfcgldsjkhcxgjkdfhlkj
+
+[target]
+follow=patrickdebois,KrisBuytaert,lusis,linus_torvalds
+
+'''

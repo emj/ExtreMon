@@ -27,6 +27,7 @@ class CauldronToPlugin(Thread):
   
   def run(self):
     self.running=True
+    self.log("running")
     self.cauldron=CauldronReceiver(self.cauldronAddr,self)
     while self.running:
       self.cauldron.receive_shuttle()
@@ -73,6 +74,7 @@ class PluginToCauldron(Thread):
 
   def run(self):
     self.running=True
+    self.log("running")
     self.cauldron=CauldronSender(self.cauldronAddr)
     for recordBytes in self.plugin:
       if len(recordBytes)>1:
@@ -87,12 +89,11 @@ class PluginToCauldron(Thread):
           if allow:
             self.cauldron.put(label,value)
           else:
-            self.log("%s: label [%s] does not match filter (%s)" %
-                     (self.name,label,self.outFilterExpr),
+            self.log("Label [%s] does not match filter (%s)" %
+                     (label,self.outFilterExpr),
                       syslog.LOG_WARNING)
         except ValueError:
-          self.log("%s: Can't Parse [%s] [%s]" % (
-              self.name,
+          self.log("Can't Parse [%s] [%s]" % (
               str(recordBytes,'utf-8').rstrip(),
               ''.join(['%02x' % (thebyte) for thebyte in recordBytes])))
 
@@ -104,7 +105,7 @@ class PluginToCauldron(Thread):
 
 class Plugin(Thread):
   def __init__(self,name,path,prefix,config,cauldronAddr,log):
-    Thread.__init__(self,name='%s' % (name))
+    Thread.__init__(self,name=name)
     self.deamon=True
     self.process=None
     self.c2p=None
@@ -119,23 +120,22 @@ class Plugin(Thread):
     self.isOutput=(self.config.get('out.filter')!=None)
     if self.isInput:
       if self.isOutput:
-        self.log("%s: in(%s)/out(%s)" % (self.name,
-                                      self.config.get('in.filter'),
-                                      self.config.get('out.filter')))
+        self.in_log(self.config.get('in.filter'))
+        self.out_log(self.config.get('out.filter'))
       else:
-        self.log("%s: in(%s)" % (self.name,self.config.get('in.filter')))
+        self.in_log(self.config.get('in.filter'))
     else:
-       self.log("%s: out(%s)" % (self.name,self.config.get('out.filter')))
+      self.out_log(self.config.get('out.filter'))
 
   def run(self):
-    self.log("%s: Starting.." % (self.name),priority=syslog.LOG_INFO)
+    self.log("starting..",priority=syslog.LOG_INFO,component=self.name)
     self.running=True
     newEnvironment=dict(environ)
     for (label,value) in self.config.items():
       newEnvironment["X3MON_%s" % (label.upper().replace('.','_'))]=value
 
     self.process=Popen(['x3:%s' % (self.name)],
-                        bufsize=0,
+                        bufsize=1,
                         executable=self.path,
                         stdin=  PIPE if self.isInput else None,
                         stdout= PIPE if self.isOutput else None,
@@ -148,7 +148,7 @@ class Plugin(Thread):
       self.c2p=CauldronToPlugin(self.name,self.cauldronAddr,
                                self.process.stdin,
                                inFilter=self.config.get('in.filter'),
-                               log=self.log,
+                               log=self.in_log,
                                outFilter=self.config.get('out.filter'))
       self.c2p.start()
 
@@ -156,25 +156,35 @@ class Plugin(Thread):
     if 'out.filter' in self.config:
       self.p2c=PluginToCauldron(self.name,self.cauldronAddr,
                                self.process.stdout,
-                               log=self.log,
+                               log=self.out_log,
                                outFilter=self.config.get('out.filter'))
     self.p2c.start()
 
     ''' in this thread, read stderr, and log output '''
     for line in self.process.stderr:
-      self.log("%s | %s" % (self.name,str(line.rstrip(),'utf-8')))
-    self.log("%s: EOF on stderr" % (self.name))
+      self.log(str(line.rstrip(),'utf-8'),component=self.name)
+    self.log("EOF on stderr",component=self.name)
 
     # reaching here implies self.process.stderr is EOF
     # this ends run()
 
+  def in_log(self,message,priority=syslog.LOG_INFO):
+    self.log( '[in] %s' % (message),
+              priority=priority,
+              component=self.name)
+
+  def out_log(self,message,priority=syslog.LOG_INFO):
+    self.log( '[out] %s' % (message),
+              priority=priority,
+              component=self.name)
+
   def stop(self):
-    self.log("%s: Asked To Stop" % (self.name))
+    self.log("Asked To Stop",component=self.name)
     if self.p2c:
       self.p2c.stop()
     if self.c2p:
       self.c2p.stop()
-    self.log("%s: Stopped" % (self.name),priority=syslog.LOG_INFO)
+    self.log("Stopped",component=self.name,priority=syslog.LOG_INFO)
 
 # ------------------------------------------------------------------------
 
@@ -218,27 +228,23 @@ class Coven(object):
       return None
     return conf
   
-  def log(self,message,priority=syslog.LOG_DEBUG):
-    if type(message)==str:
-      syslog.syslog(priority,message)
-    elif type(message)==list:
-      for line in message:
-        syslog.syslog(priority,line)
-
+  def log(self,message,component=None,priority=syslog.LOG_DEBUG):
+    syslog.syslog(priority,message if component==None 
+                                else '[%s] %s' % (component,message))
   def practice(self):
     try:
       self.dirManager.start()
     except KeyboardInterrupt:
-      self.log("Coven stopping..")
+      self.log("Stopping..")
       self.dirManager.stop()
       for partingPlugin in self.plugins.values():
         partingPlugin.stop()
-      self.log("Coven stopped..",priority=syslog.LOG_INFO)
+      self.log("Stopped..",priority=syslog.LOG_INFO)
 
 # ------------------------------------------------------------------------
 
   def startPlugin(self,name):
-    self.log("Starting [%s]" % (name)) 
+    self.log("Starting %s" % (name)) 
     config=self.getConfig(name)
     if config:
       try:
@@ -246,21 +252,21 @@ class Coven(object):
                                  self.prefix, config, self.cauldronAddr,
                                  self.log)
         self.plugins[name].start()
-        self.log("%s Started" % (name),priority=syslog.LOG_INFO)
+        self.log("Started %s" % (name),priority=syslog.LOG_INFO)
       except:
-        self.log("%s Failed To Start" % (name),priority=syslog.LOG_ERR)
+        self.log("Failed To Start %s" % (name),priority=syslog.LOG_ERR)
     else:
-      self.log("%s Is Not an X3 Plugin" % (name),
+      self.log("Not an X3 Plugin: %s" % (name),
                priority=syslog.LOG_WARNING)
 
   def stopPlugin(self,name):
-    self.log("Stopping [%s]" % (name))
+    self.log("Stopping %s" % (name))
     try:
       self.plugins[name].stop()
       del self.plugins[name]
-      self.log("%s Stopped" % (name),priority=syslog.LOG_INFO) 
+      self.log("Stopped %s" % (name),priority=syslog.LOG_INFO) 
     except:
-      self.log("%s Failed To Stop" % (name),priority=syslog.LOG_ERR) 
+      self.log("Failed To Stop %s" % (name),priority=syslog.LOG_ERR) 
 
 # ------------------------------------------------------------------------
 
@@ -271,7 +277,7 @@ class Coven(object):
     self.stopPlugin(name)
 
   def process_FileChanged(self,name):
-    self.log("Restarting [%s]" % (name),priority=syslog.LOG_INFO) 
+    self.log("Restarting %s" % (name),priority=syslog.LOG_INFO) 
     self.stopPlugin(name)
     self.startPlugin(name)
   

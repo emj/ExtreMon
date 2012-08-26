@@ -6,6 +6,7 @@ from x3plugin import X3IO
 
 class PSCPU(X3IO):
   def __init__(self):
+    self.log("running")
     self.cmas={}
     self.mins={}
     self.maxs={}

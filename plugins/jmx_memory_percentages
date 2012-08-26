@@ -7,6 +7,7 @@ from x3plugin import X3IO
 
 class JAVAMEM(X3IO):
   def __init__(self):
+    self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
 
   def receive(self,shuttle):
@@ -22,7 +23,7 @@ class JAVAMEM(X3IO):
         self.put('%s.used.percentage' % (prefix),str((used/max)*100.0))
         self.put('%s.max.percentage' % (prefix),'100.0')
       except KeyError:
-        self.log("%s not complete yet" % (prefix))
+        pass
 
 JAVAMEM()
   
