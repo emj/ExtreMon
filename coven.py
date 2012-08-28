@@ -137,6 +137,7 @@ class Plugin(Thread):
     self.process=Popen(['x3:%s' % (self.name)],
                         bufsize=1,
                         executable=self.path,
+                        cwd=path.dirname(self.path),
                         stdin=  PIPE if self.isInput else None,
                         stdout= PIPE if self.isOutput else None,
                         stderr= PIPE,
@@ -190,7 +191,7 @@ class Plugin(Thread):
 
 class Coven(object):
   def __init__( self,path,prefix,cauldronAddr,
-                ignore=[r'^\.',r'\.x?swp$',r'~',r'^__',r'__$']):
+                ignore=[r'^\.',r'\.x?swp$',r'~',r'^__',r'__$',r'\.jar$']):
     syslog.openlog(ident="X3Coven",facility=syslog.LOG_DAEMON)
     self.path=path
     self.prefix=prefix
