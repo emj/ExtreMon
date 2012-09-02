@@ -1,0 +1,43 @@
+#!/usr/bin/python
+#x3.prefix=be.fedict.eid.ext.tsl
+#x3.url=http://tsl.belgium.be/tsl-be.xml
+#x3.delay=1000
+#x3.out.filter=^be\.fedict\.eid\.ext\.tsl\.tslprobe\.(result|responsetime|validityleft)$
+import urllib.request,time,datetime,sys,os
+from urllib.request import urlopen
+from lxml import etree
+from x3plugin import X3Out
+
+class TSLProbe(X3Out):
+  def __init__(self):
+    self.log("running")
+    X3Out.__init__(self)
+    self.url=self.config['url']
+    self.prefix=self.config['prefix']
+    self.delay=float(self.config['delay'])/1000.0
+    self.namespaces={'tsl': 'http://uri.etsi.org/02231/v2#'}
+
+    while True:
+      try:
+        start=time.time()
+        socket=urlopen(self.url)
+        status=etree.parse(socket)
+        end=time.time()
+
+        nextUpdateElementList=status.xpath('//tsl:TrustServiceStatusList/tsl:SchemeInformation/tsl:NextUpdate/tsl:dateTime',namespaces=self.namespaces)
+        nextUpdateStr=nextUpdateElementList[0].text
+        nextUpdate=datetime.datetime.strptime(nextUpdateStr, "%Y-%m-%dT%H:%M:%S.%fZ")
+        timeUntilNextUpdate=nextUpdate-datetime.datetime.now()
+
+        secondsUntilNextUpdate=int(timeUntilNextUpdate.total_seconds())
+
+        self.put('%s.tslprobe.result' % (self.prefix),0)
+        self.put('%s.tslprobe.responsetime' % (self.prefix),'%.2f' % ((end-start)*1000.0))
+        self.put('%s.tslprobe.validityleft' % (self.prefix),secondsUntilNextUpdate)
+
+        time.sleep(self.delay)
+      except:
+        self.put('%s.tslprobe.result' % (self.prefix),1)
+
+if __name__=='__main__':
+  TSLProbe()

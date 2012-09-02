@@ -83,12 +83,12 @@ class Loom(Thread):
 
 # internal launch (python3). don't call directly
   def _launch_p3(self,shuttle): 
-    self.launcher('%s\n' % ('\n'.join(['%s=%s' % (label,value) 
+    self.launcher('%s\n\n' % ('\n'.join(['%s=%s' % (label,value) 
                             for (label,value) in shuttle.items()])))
 
 # internal launch (python2). don't call directly
   def _launch_p2(self,shuttle): 
-    self.launcher('%s\n' % ('\n'.join(['%s=%s' % (label,value) 
+    self.launcher('%s\n\n' % ('\n'.join(['%s=%s' % (label,value) 
                             for (label,value) in shuttle.items()])).encode('utf-8'))
 
 # launch using python2 or 3 launcher

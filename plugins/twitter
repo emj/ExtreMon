@@ -44,7 +44,7 @@ class TwitterOut(X3Out):
         if len(line)>2:
           try:
             record=json.loads(line.rstrip().decode('utf-8'))
-            self.log(json.dumps(record,indent=2))
+#            self.log(json.dumps(record,indent=2))
             try:
               if 'text' in record and not record['retweeted']:
                 user=record['user']

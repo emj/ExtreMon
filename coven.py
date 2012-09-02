@@ -2,16 +2,36 @@
 from dirmanager   import DirManager
 from os           import path,environ
 from subprocess   import Popen,PIPE
-from threading    import Thread
+from threading    import Thread,Lock
 from queue        import Queue,Empty
 from extremon     import CauldronReceiver,CauldronSender
-import re,traceback,sys,signal,syslog
+import re,traceback,sys,signal,syslog,time
 
 # ------------------------------------------------------------------------
 
-class CauldronToPlugin(Thread):
+class Countable(object):
+  def __init__(self):
+    self.labels_allowed=0
+    self.counters={}
+
+  def reset_counters(self):
+    for label in self.counters.keys():
+      self.counters[label]=0
+
+  def get_counters(self):
+    self.counters['labels_allowed']=self.labels_allowed
+    return self.counters
+
+  def count(self,label,increment):
+    try:
+      self.counters[label]+=increment
+    except KeyError:
+      self.counters[label]=increment
+
+class CauldronToPlugin(Thread,Countable):
   def __init__(self,name,cauldronAddr,plugin,inFilter,log,outFilter=None):
     Thread.__init__(self,name="%s (in)" % (name))
+    Countable.__init__(self)
     self.daemon=True
     self.cauldronAddr=cauldronAddr
     self.plugin=plugin
@@ -31,7 +51,6 @@ class CauldronToPlugin(Thread):
     self.cauldron=CauldronReceiver(self.cauldronAddr,self)
     while self.running:
       self.cauldron.receive_shuttle()
-    self.plugin.close()
 
   def handle_shuttle(self,shuttle):
     if not self.running:
@@ -40,17 +59,23 @@ class CauldronToPlugin(Thread):
       try:
         allow=self.allowCache[label]
       except KeyError:
+        self.count('new_labels_per_second',1)
         allow= (( self.inFilter.search(label)!=None) and
                (( self.outFilter==None or not
                 ( self.outFilter.search(label)))))
         self.allowCache[label]=allow
+        if allow:
+          self.labels_allowed+=1
       if allow:
         self.accu.add("%s=%s" % (label,value))
 
     if len(self.accu)>0:
       try:
-        self.plugin.write(bytes('%s\n' %
-                          ('\n\n'.join(self.accu)),'utf-8'))
+        databytes=(bytes('%s\n' % ('\n\n'.join(self.accu)),'utf-8'))
+        self.plugin.write(databytes)
+        self.count('bytes_per_second',len(databytes))
+        self.count('shuttles_per_second',1)
+        self.count('records_per_second',len(self.accu))
         self.accu.clear()
       except IOError:
         self.running=False
@@ -58,11 +83,13 @@ class CauldronToPlugin(Thread):
   def stop(self):
     self.running=False
 
+
 # ------------------------------------------------------------------------
 
-class PluginToCauldron(Thread):
+class PluginToCauldron(Thread,Countable):
   def __init__(self,name,cauldronAddr,plugin,log,outFilter):
     Thread.__init__(self,name="%s (out)" % (name))
+    Countable.__init__(self)
     self.daemon=True
     self.cauldronAddr=cauldronAddr
     self.plugin=plugin
@@ -77,6 +104,8 @@ class PluginToCauldron(Thread):
     self.log("running")
     self.cauldron=CauldronSender(self.cauldronAddr)
     for recordBytes in self.plugin:
+      if not self.running:
+        return
       if len(recordBytes)>1:
         try:
           record=str(recordBytes,'UTF-8')
@@ -84,10 +113,14 @@ class PluginToCauldron(Thread):
           try:
             allow=self.allowCache[label]
           except KeyError:
+            self.count('new_labels_per_second',1)
             allow=(self.outFilter.search(label)!=None)
             self.allowCache[label]=allow
+            self.labels_allowed+=1
           if allow:
             self.cauldron.put(label,value)
+            self.count('records_per_second',1)
+            self.count('bytes_per_second',len(recordBytes))
           else:
             self.log("Label [%s] does not match filter (%s)" %
                      (label,self.outFilterExpr),
@@ -96,10 +129,11 @@ class PluginToCauldron(Thread):
           self.log("Can't Parse [%s] [%s]" % (
               str(recordBytes,'utf-8').rstrip(),
               ''.join(['%02x' % (thebyte) for thebyte in recordBytes])))
+      else:
+        self.count('shuttles_per_second',1)
 
-     
   def stop(self):
-    pass
+    self.running=False
 
 # ------------------------------------------------------------------------
 
@@ -118,6 +152,8 @@ class Plugin(Thread):
     self.cauldronAddr=cauldronAddr
     self.isInput=(self.config.get('in.filter')!=None)
     self.isOutput=(self.config.get('out.filter')!=None)
+    self.counters={'in':{},'out':{}}
+
     if self.isInput:
       if self.isOutput:
         self.in_log(self.config.get('in.filter'))
@@ -185,7 +221,21 @@ class Plugin(Thread):
       self.p2c.stop()
     if self.c2p:
       self.c2p.stop()
+    self.process.terminate()
     self.log("Stopped",component=self.name,priority=syslog.LOG_INFO)
+
+  def get_counters(self):
+    if self.p2c:
+      self.counters['out']=self.p2c.get_counters()
+    if self.c2p:
+      self.counters['in']=self.c2p.get_counters()
+    return self.counters
+
+  def reset_counters(self):
+    if self.p2c:
+      self.p2c.reset_counters()
+    if self.c2p:
+      self.c2p.reset_counters()
 
 # ------------------------------------------------------------------------
 
@@ -228,6 +278,9 @@ class Coven(object):
     except:
       return None
     return conf
+
+  def put(self,label,value):
+    self.cauldron.put('%s.coven.%s' % (self.prefix,label),value)
   
   def log(self,message,component=None,priority=syslog.LOG_DEBUG):
     syslog.syslog(priority,message if component==None 
@@ -235,11 +288,36 @@ class Coven(object):
   def practice(self):
     try:
       self.dirManager.start()
+      while True:
+        totals={}
+        self.put('plugins.running',len(self.plugins))
+        for plugin in self.plugins.values():
+          for (values_type,values) in plugin.get_counters().items():
+            try:
+              total_values=totals[values_type]
+            except KeyError:
+              total_values={}
+              totals[values_type]=total_values
+            for (label,value) in values.items():
+              try:
+                total_values[label]+=value
+              except KeyError:
+                total_values[label]=value
+              self.put('plugin.%s.%s.%s' %
+                                (plugin.name,values_type,label),value)
+          plugin.reset_counters()
+
+        for (values_type,values) in totals.items():
+          for (label,value) in values.items():
+            self.put('plugins.total.%s.%s' % (values_type,label),value)
+        time.sleep(1.0)
     except KeyboardInterrupt:
       self.log("Stopping..")
       self.dirManager.stop()
       for partingPlugin in self.plugins.values():
         partingPlugin.stop()
+      for partingPlugin in self.plugins.values():
+        partingPlugin.join()
       self.log("Stopped..",priority=syslog.LOG_INFO)
 
 # ------------------------------------------------------------------------
@@ -287,5 +365,5 @@ class Coven(object):
 if __name__=='__main__':
   signal.signal(signal.SIGCHLD, signal.SIG_IGN)
   environ['PYTHONPATH']=sys.path[0]
-  coven=Coven('/opt/extremon/plugins','be.apsu',('224.0.0.1',1249))
+  coven=Coven('/opt/extremon/plugins','be.apsu.eridu',('224.0.0.1',1249))
   coven.practice()
