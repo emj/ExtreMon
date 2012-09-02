@@ -1,4 +1,25 @@
 #!/usr/bin/python3
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
 from os import listdir,path
 from time import sleep
 import pyinotify, hashlib,re
@@ -30,7 +51,7 @@ class PrintingDirWatcher(object):
 
 
 """ DirManager takes a path in the filesystem and a DirWatcher,
-    uses PyIntotify to capture events on that path, and calls
+    uses PyInotify to capture events on that path, and calls
     the DirWatcher with a somewhat higher-level interface.
     Note that while starting up, files already present will 
     cause "Created" notifications, for consistency """
@@ -131,14 +152,4 @@ class DirManager(pyinotify.ProcessEvent):
             return md5.digest()
         except IOError:
             return None
-
-# -------------------------------------------------------------
-
-if __name__=='__main__':
-    master=DirManager(  '/opt/extremon/plugins',
-                        PrintingDirWatcher(),
-                        ignore=[r'^\.',r'\.x?swp$',r'~'])
-    master.start()
-    sleep(30)
-    master.stop()
 

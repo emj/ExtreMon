@@ -21,17 +21,16 @@
 #	along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import 							sys, re, sre_constants
-from http.server		import 	HTTPServer,BaseHTTPRequestHandler
-from socketserver		import 	ThreadingMixIn
+import 						sys, re, sre_constants
+from http.server	import 	HTTPServer,BaseHTTPRequestHandler
+from socketserver	import 	ThreadingMixIn
 from queue 				import 	Queue,Full
 from socket 			import 	error
 from extremon			import 	CauldronReceiver,ChaliceServer
-from threading			import 	Thread
+from threading		import 	Thread
 
 
 class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
-
 	server_version = "Extremon/0.1"
 
 	def valid_selector(self,path):
@@ -65,7 +64,6 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
 	def do_GET(self):
 		self.shuttle=set()
 		self.select_cache={}
-
 		if self.path and self.valid_selector(self.path):
 			try:
 				regex=self.regexify(self.path)
@@ -84,19 +82,17 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
 			self.send_header("Content-type", "text/plain")
 			self.send_header("Access-Control-Allow-Origin", "*")
 			self.end_headers()
-
 			self.running=True
 			self.outq=Queue(maxsize=1000)
-
 			self.server.add_consumer(self)
-
 			while self.running:
 				try:
 					data=self.outq.get()
 					self.shuttle.clear()
 					self.assemble_shuttle(data)
 					if len(self.shuttle)>0:
-						self.wfile.write(bytes('%s\n\n' % ('\n'.join(self.shuttle)),'UTF-8'))
+						self.wfile.write(bytes(	'%s\n\n' % ('\n'.join(self.shuttle)),
+																		'UTF-8'))
 					self.outq.task_done()
 				except error:
 					self.running=False
@@ -109,10 +105,10 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
 		except Full:
 			pass
 			
-class HTTPSelectiveChaliceServer(ThreadingMixIn, ChaliceServer,HTTPServer):
+class HTTPSelectiveChaliceServer(ThreadingMixIn,ChaliceServer,HTTPServer):
 	def __init__(self,listen,prefix):
-		HTTPServer.__init__(self,listen, HTTPSelectiveChaliceRequestHandler)
-		ChaliceServer.__init__(self, prefix)
+		HTTPServer.__init__(self,listen,HTTPSelectiveChaliceRequestHandler)
+		ChaliceServer.__init__(self,prefix)
 
 class HTTPSelectiveChaliceDispatcher(Thread):
 	def __init__(self,mcast_addr,listen,prefix):
@@ -132,7 +128,6 @@ class HTTPSelectiveChaliceDispatcher(Thread):
 			self.server.write(data)
 
 if __name__=='__main__':
-
 	if len(sys.argv)==2:
 		listen_addr=''
 		listen_port=17817
@@ -142,8 +137,8 @@ if __name__=='__main__':
 	else:
 		print("Usage: http_server.py <prefix> [<listen_addr> <listen_port>]")
 		sys.exit(-1)
-
 	prefix=sys.argv[1]
-
-	HTTPSelectiveChaliceDispatcher(mcast_addr=('224.0.0.1',1249),listen=(listen_addr,listen_port),prefix=prefix)
+	HTTPSelectiveChaliceDispatcher(	mcast_addr=('224.0.0.1',1249),
+																	listen=(listen_addr,listen_port),
+																	prefix=prefix)
 

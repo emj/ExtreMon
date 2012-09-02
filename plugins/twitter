@@ -1,12 +1,32 @@
 #!/usr/bin/python2
 #x3.prefix=com.twitter.tweet
 #x3.out.filter=^com\.twitter\.tweet\.([a-zA-z0-9]+)\.([0-9]+)\.(text|screen_name|name|profile_image_url)$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
 import socket
 socket._fileobject.default_bufsize = 1
 import oauth2 as oauth
 import time,urllib2,json,sys,ConfigParser,os
 from x3plugin import X3Out
-#------------------------------------------------------------------------
 
 class TwitterOut(X3Out):
   def __init__(self):
