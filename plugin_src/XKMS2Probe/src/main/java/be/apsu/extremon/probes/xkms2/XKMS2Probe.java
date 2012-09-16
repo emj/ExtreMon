@@ -27,7 +27,9 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.LinkedList;
 import java.util.List;
+
 import org.apache.commons.codec.binary.Base64;
+
 import be.apsu.extremon.plugin.X3Conf;
 import be.apsu.extremon.plugin.X3Log;
 import be.apsu.extremon.plugin.X3Out;
@@ -35,10 +37,13 @@ import be.fedict.trust.client.XKMS2Client;
 import be.fedict.trust.client.exception.RevocationDataNotFoundException;
 import be.fedict.trust.client.exception.TrustDomainNotFoundException;
 import be.fedict.trust.client.exception.ValidationFailedException;
+
 import com.sun.xml.ws.client.ClientTransportException;
 
 public class XKMS2Probe
-{
+{	
+	private static final int DEFAULT_DELAY = 1000;
+	
 	// extremon config
 	final private X3Conf					config;
 	final private X3Out						out;
@@ -50,6 +55,7 @@ public class XKMS2Probe
 	final private String					domain,prefix;
 	final private int						delay;
 	final private boolean					returnRevocationData;
+	final private String					expectedFailure;
 	
 	private boolean							running;
 
@@ -60,19 +66,20 @@ public class XKMS2Probe
 		this.out=new X3Out();
 		this.trustService=new XKMS2Client(this.config.get("url"));
 		this.certChain=new LinkedList<X509Certificate>();
-		this.delay=this.config.getInt("delay",1000);
+		this.delay=this.config.getInt("delay",DEFAULT_DELAY);
 		this.domain=this.config.get("trust.domain").toUpperCase();
 		this.prefix=this.config.get("prefix");
 		this.returnRevocationData=this.config.getBoolean("return.revocation.data",false);
+		this.expectedFailure=this.config.get("expected.failure")!=null?this.config.get("expected.failure").toLowerCase():null;
 		this.running=false;
 		
-		CertificateFactory certificateFactory=CertificateFactory.getInstance("X.509");
+		final CertificateFactory certificateFactory=CertificateFactory.getInstance("X.509");
 
-		String[] chain=this.config.get("chain").toLowerCase().split(",");
+		final String[] chain=this.config.get("chain").toLowerCase().split(",");
 		for(String certName:chain)
 		{
-			String encodedCert=this.config.get("cert."+certName);
-			X509Certificate cert=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(encodedCert)));
+			final String encodedCert=this.config.get("cert."+certName);
+			final X509Certificate cert=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(encodedCert)));
 			this.certChain.add(cert);
 		}
 		
@@ -80,7 +87,7 @@ public class XKMS2Probe
 		this.logger.log("Initialized");
 	}
 
-	public void run()
+	public final void run()
 	{
 		double start=0,end=0;
 		this.logger.log("running");
@@ -92,57 +99,88 @@ public class XKMS2Probe
 				start=System.currentTimeMillis();
 				trustService.validate(this.domain,this.certChain,this.returnRevocationData);
 				end=System.currentTimeMillis();
-				this.out.put(this.prefix+".xkms2probe.result",0);
-				this.out.put(this.prefix+".xkms2probe.result.comment","trust service validates chain");
+				
+				if(this.expectedFailure==null)
+				{
+					this.out.put(this.prefix+".state",0);
+					this.out.put(this.prefix+".state.comment","trust service validates chain (as it should)");
+				}
+				else
+				{
+					this.out.put(this.prefix+".state",2);
+					this.out.put(this.prefix+".state.comment","trust service validates chain (expected reject with [" + this.expectedFailure + "]!)");
+				}
 			}
-			catch(CertificateEncodingException ex)
+			catch(final CertificateEncodingException ex)
 			{
 				end=System.currentTimeMillis();
-				this.out.put(this.prefix+".xkms2probe.result",-1);
-				this.out.put(this.prefix+".xkms2probe.result.comment","bad certificate encoding");
+				this.out.put(this.prefix+".state",2);
+				this.out.put(this.prefix+".state.comment","bad certificate encoding - check test configuration");
 				this.logger.log("Certificate Encoding Exception (Configuration Problem?)");
 			}
-			catch(TrustDomainNotFoundException ex)
+			catch(final TrustDomainNotFoundException ex)
 			{
 				end=System.currentTimeMillis();
-				this.out.put(this.prefix+".xkms2probe.result",-2);
-				this.out.put(this.prefix+".xkms2probe.result.comment","trust domain not found");
+				this.out.put(this.prefix+".state",2);
+				this.out.put(this.prefix+".state.comment","trust domain [" + this.domain + "] not found - check test configuration");
 				this.logger.log("Trust Domain Not Found (Configuration Problem?)");
 			}
-			catch(ValidationFailedException ex)
+			catch(final ValidationFailedException ex)
 			{
 				end=System.currentTimeMillis();
-				this.out.put(this.prefix+".xkms2probe.result",1);
-				this.out.put(this.prefix+".xkms2probe.result.comment","trust service rejects chain");
+				boolean expected=false;
+				
+				if(this.expectedFailure!=null)
+				{
+					for(String reason:ex.getReasons())
+					{
+						if(reason.toLowerCase().endsWith(this.expectedFailure))
+						{
+							expected=true;
+							continue;
+						}
+					}
+				}
+				
+				if(expected)
+				{
+					this.out.put(this.prefix+".state",0);
+					this.out.put(this.prefix+".state.comment","trust service rejects chain with [" + this.expectedFailure + "] (as it should)");
+				}
+				else
+				{
+					this.out.put(this.prefix+".state",2);
+					this.out.put(this.prefix+".state.comment","trust service rejects chain (expected validation!)");
+				}
 			}
-			catch(ClientTransportException ex)
+			catch(final ClientTransportException ex)
 			{
 				end=System.currentTimeMillis();
-				this.out.put(this.prefix+".xkms2probe.result",2);
-				this.out.put(this.prefix+".xkms2probe.result.comment","transport problem");
+				this.out.put(this.prefix+".state",2);
+				this.out.put(this.prefix+".state.comment","transport problem");
 			}
 			
-			catch(RevocationDataNotFoundException ex)
+			catch(final RevocationDataNotFoundException ex)
 			{
 				end=System.currentTimeMillis();
-				this.out.put(this.prefix+".xkms2probe.result",3);
-				this.out.put(this.prefix+".xkms2probe.result.comment","revocation data not found");
+				this.out.put(this.prefix+".state",2);
+				this.out.put(this.prefix+".state.comment","revocation data not found");
 			}
 			
-			this.out.put(this.prefix+".xkms2probe.responsetime",(end-start));
+			this.out.put(this.prefix+".responsetime",(end-start));
 
 			try
 			{
 				Thread.sleep(this.delay);
 			}
-			catch(InterruptedException ex)
+			catch(final InterruptedException ex)
 			{
 				this.logger.log("interrupted");
 			}
 		}
 	}
 
-	public static void main(String[] args) throws CertificateException
+	public static void main(final String[] args) throws CertificateException
 	{
 		new XKMS2Probe().run();
 	}
