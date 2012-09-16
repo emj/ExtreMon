@@ -38,9 +38,9 @@ class JAVAMEM(X3IO):
         committed=float(self.cached['%s.committed.value' % (prefix)])
         used=float(self.cached['%s.used.value' % (prefix)])
         max=float(self.cached['%s.max.value' % (prefix)])
-        self.put('%s.init.percentage' % (prefix),str((init/max)*100.0))
-        self.put('%s.committed.percentage' % (prefix),str((committed/max)*100.0))
-        self.put('%s.used.percentage' % (prefix),str((used/max)*100.0))
+        self.put('%s.init.percentage' % (prefix),((init/max)*100.0))
+        self.put('%s.committed.percentage' % (prefix),((committed/max)*100.0))
+        self.put('%s.used.percentage' % (prefix),((used/max)*100.0))
         self.put('%s.max.percentage' % (prefix),'100.0')
       except KeyError:
         pass

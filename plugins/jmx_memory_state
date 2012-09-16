@@ -1,0 +1,57 @@
+#!/usr/bin/python3
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+)\.genericjmx\.memory_pool-(?P<generation>[a-z]+)\.jmx_memory\.used\.percentage$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.genericjmx\.memory_pool-(?P<generation>[a-z]+)\.jmx_memory\.used\.percentage\.state$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+import re
+
+used_thresholds={'edenspace':(40,60),'paredenspace':(40,60),
+                 'survivorspace':(40,60),'parsurvivorspace':(40,60),
+                 'cmsoldgen':(40,60),'cmspermgen':(40,60),
+                 'codecache':(40,60)}
+
+class JAVAMEMSTATE(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,cache=True,capture=True)
+
+  def receive(self,shuttle):
+    for (label,value,captures) in shuttle:
+      try:
+        value=float(value)
+        prefix=captures['prefix']
+        generation=captures['generation']
+        
+        try:
+          (warn_thresh,err_thresh)=used_thresholds[generation]
+          if value>err_thresh:
+            self.put('%s.genericjmx.memory_pool-%s.jmx_memory.used.percentage.state' % (prefix,generation),'2')
+          elif value>warn_thresh:
+            self.put('%s.genericjmx.memory_pool-%s.jmx_memory.used.percentage.state' % (prefix,generation),'1')
+          else:
+            self.put('%s.genericjmx.memory_pool-%s.jmx_memory.used.percentage.state' % (prefix,generation),'0')
+        except KeyError:
+          pass
+      except KeyError:
+        pass
+
+JAVAMEMSTATE()

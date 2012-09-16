@@ -1,0 +1,64 @@
+#!/usr/bin/python2
+#x3.url=https://dss.services.belgium.be/eid-dss/identity.pem
+#x3.prefix=be.fedict.eid.prod.dss.ws.cert
+#x3.error.comment=Unable To Acquire Certificate
+#x3.ok.comment=Valid For 2 Weeks or More
+#x3.validity.warning.comment=Less Than 2 Weeks Of Validity Left. Please Replace Soon.
+#x3.validity.warning.threshold=1209600
+#x3.validity.error.comment=Less Than One Week of Valitity Left. Please Replace Now!
+#x3.validity.error.threshold=604800
+#x3.out.filter=^be\.fedict\.eid\.prod\.dss\.ws\.cert\.(validityleft|state|state\.comment|responsetime)$
+#x3.delay=1000
+import urllib,time,datetime,sys,os
+from M2Crypto import X509
+from x3plugin import X3Out
+
+class NotAfterProbe(X3Out):
+  def __init__(self):
+    X3Out.__init__(self)
+    self.url=self.config['url']
+    self.delay=float(self.config['delay'])/1000.0
+    self.prefix=self.config['prefix']
+    self.validityWarnTresh=int(self.config['validity.warning.threshold'])
+    self.validityErrorTresh=int(self.config['validity.error.threshold'])
+    self.validityWarnComment=self.config['validity.warning.comment']
+    self.validityErrorComment=self.config['validity.error.comment']
+    self.errorComment=self.config['error.comment']
+    self.okComment=self.config['ok.comment']
+    while True:
+      try:
+        start=time.time()
+        try:
+          socket=urllib.urlopen(self.url)
+          pemcert=socket.read()
+          end=time.time()
+          cert=X509.load_cert_string(pemcert,X509.FORMAT_PEM)
+        except:
+          self.put('%s.state' % (self.prefix),'2')
+          self.put('%s.state.comment' % (self.prefix),self.errorComment)
+        finally:
+          socket.close()
+        notAfter=cert.get_not_after().get_datetime().replace(tzinfo=None)
+        now=(datetime.datetime.utcnow())
+        timeUntilNextUpdate=notAfter-now
+        secondsUntilNextUpdate=int((timeUntilNextUpdate.microseconds + (timeUntilNextUpdate.seconds + timeUntilNextUpdate.days * 24 * 3600) * 10**6) / 10**6)
+        self.put('%s.validityleft' % (self.prefix),secondsUntilNextUpdate)
+        self.put('%s.responsetime' % (self.prefix),(end-start)*1000.0)
+
+        if secondsUntilNextUpdate<self.validityErrorTresh:
+          self.put('%s.state' % (self.prefix),'2')
+          self.put('%s.state.comment' % (self.prefix),self.validityErrorComment)
+        elif secondsUntilNextUpdate<self.validityWarnTresh:
+          self.put('%s.state' % (self.prefix),'1')
+          self.put('%s.state.comment' % (self.prefix),self.validityWarnComment)
+        else:
+          self.put('%s.state' % (self.prefix),'0')
+          self.put('%s.state.comment' % (self.prefix),self.okComment)
+
+      except:
+        self.log(str(sys.exc_info()))
+        self.put('%s.state' % (self.prefix),'2')
+        self.put('%s.state.comment' % (self.prefix),sys.exc_info())
+      time.sleep(self.delay)
+
+NotAfterProbe()
