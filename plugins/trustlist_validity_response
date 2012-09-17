@@ -2,7 +2,13 @@
 #x3.prefix=be.fedict.eid.ext.tsl
 #x3.url=http://tsl.belgium.be/tsl-be.xml
 #x3.delay=1000
-#x3.out.filter=^be\.fedict\.eid\.ext\.tsl\.tslprobe\.(result|responsetime|validityleft)$
+#x3.error.comment=Unable To Acquire TrustList
+#x3.ok.comment=Valid For 6 Weeks Or More
+#x3.validity.warning.comment=Less Than 6 Weeks Of Validity Left. Signing Ceremony Planning Required.
+#x3.validity.warning.threshold=3628800
+#x3.validity.error.comment=Valid For Less Than 2 Weeks! If No Signing Ceremony Occurred, Validity Will Expire Before Replacement!!
+#x3.validity.error.threshold=1209600
+#x3.out.filter=^be\.fedict\.eid\.ext\.tsl\.tslprobe\.(result\.state|result\.comment|responsetime|validityleft)$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -36,6 +42,12 @@ class TSLProbe(X3Out):
     self.url=self.config['url']
     self.prefix=self.config['prefix']
     self.delay=float(self.config['delay'])/1000.0
+    self.validityWarnTresh=int(self.config['validity.warning.threshold'])
+    self.validityErrorTresh=int(self.config['validity.error.threshold'])
+    self.validityWarnComment=self.config['validity.warning.comment']
+    self.validityErrorComment=self.config['validity.error.comment']
+    self.errorComment=self.config['error.comment']
+    self.okComment=self.config['ok.comment']
     self.namespaces={'tsl': 'http://uri.etsi.org/02231/v2#'}
 
     while True:
@@ -52,13 +64,23 @@ class TSLProbe(X3Out):
 
         secondsUntilNextUpdate=int(timeUntilNextUpdate.total_seconds())
 
-        self.put('%s.tslprobe.result' % (self.prefix),0)
         self.put('%s.tslprobe.responsetime' % (self.prefix),'%.2f' % ((end-start)*1000.0))
         self.put('%s.tslprobe.validityleft' % (self.prefix),secondsUntilNextUpdate)
 
+        if secondsUntilNextUpdate<self.validityErrorTresh:
+          self.put('%s.tslprobe.result.state' % (self.prefix),2)
+          self.put('%s.tslprobe.result.comment' % (self.prefix),self.validityErrorComment)
+        elif secondsUntilNextUpdate<self.validityWarnTresh:
+          self.put('%s.tslprobe.result.state' % (self.prefix),1)
+          self.put('%s.tslprobe.result.comment' % (self.prefix),self.validityWarnComment)
+        else:
+          self.put('%s.tslprobe.result.state' % (self.prefix),0)
+          self.put('%s.tslprobe.result.comment' % (self.prefix),self.okComment)
+
         time.sleep(self.delay)
       except:
-        self.put('%s.tslprobe.result' % (self.prefix),1)
+        self.put('%s.tslprobe.result.state' % (self.prefix),2)
+        self.put('%s.tslprobe.result.comment' % (self.prefix),self.errorComment)
 
 if __name__=='__main__':
   TSLProbe()

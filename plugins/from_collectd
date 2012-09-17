@@ -1,0 +1,7 @@
+#!/bin/bash
+#x3.types.db=/usr/share/collectd/types.db
+#x3.types.db.custom=/usr/share/collectd/types.db.custom
+#x3.gremlins=[^a-z0-9._/;:-]+
+#x3.out.filter=^(be\.fedict|be\.apsu|be\.colifra)\.
+PYTHONPATH="/opt/extremon/"
+python3 -m cProfile ./from_collectd.jar -o /tmp/from_collectd_dump

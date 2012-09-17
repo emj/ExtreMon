@@ -69,7 +69,7 @@ class Loom(Thread):
 
   def put(self,label,_value):
     if isinstance(_value, Number):
-      value=str(_value)
+      value=str(round(_value,3))
     else:
       value=_value
     if '=' in label or '\n' in label or '=' in value or '\n' in value:
