@@ -26,12 +26,9 @@
 #   You should have received a copy of the GNU General Public License
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
-# *Heavily* based on collectd_network.py:
-# https://github.com/octo/collectd/blob/master/contrib/collectd_network.py
-# which is Copyright © 2009 Adrian Perez <aperez@igalia.com>
-# Adrian did all the truly hard stuff parsing the binary format, and
-# gracefully upgraded the licence to GPLv3 for me.
-# All the bugs are mine :-)
+# Heavily based on collectd_network.py, which is Copyright 
+# © 2009 Adrian Perez <aperez@igalia.com> (part of the collectd
+# source distribution, under contrib/
 #
 
 import socket,struct,sys,re,time
@@ -78,17 +75,15 @@ double = struct.Struct("<d")
 
 class FromCollectd(X3Out):
 
-    BUFFER_SIZE = 16384
+    BUFFER_SIZE = 16436
 
     def __init__(self):
-      X3Out.__init__(self,max_shuttle_size=512,max_shuttle_age=.1)
-      self.ip_address_pattern=re.compile(r"(25[0-5]|2[0-4][0-9]|[01]?"
-      "[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\."
-      "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\."
-      "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
+      X3Out.__init__(self,max_shuttle_size=512,max_shuttle_age=.2)
+      self.ip_address_pattern=re.compile(r"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
       self.ip_address_subst=r'\1-\2-\3-\4'
       self.zapgremlins_pattern=re.compile(self.config['zapgremlins'])
       self.read_types()
+      self.derive_cache={}
       self.labels={}
       self.counters=set()
 
@@ -97,13 +92,13 @@ class FromCollectd(X3Out):
       multicast=('multicast' in self.config)
 
       if host is None:
-        multicast = True
-        host = DEFAULT_IPv4_GROUP
+          multicast = True
+          host = DEFAULT_IPv4_GROUP
 
-      self.host,self.port=host,port
-      self.ipv6=":" in self.host
+      self.host, self.port = host, port
+      self.ipv6 = ":" in self.host
 
-      family,socktype,proto,canonname,sockaddr = socket.getaddrinfo(
+      family, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
               None if multicast else self.host, self.port,
               socket.AF_INET6 if self.ipv6 else socket.AF_UNSPEC,
               socket.SOCK_DGRAM, 0, socket.AI_PASSIVE)[0]
@@ -113,25 +108,27 @@ class FromCollectd(X3Out):
       self._sock.bind(sockaddr)
 
       if multicast:
-        if hasattr(socket,"SO_REUSEPORT"):
-          self._sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEPORT, 1)
+          if hasattr(socket, "SO_REUSEPORT"):
+              self._sock.setsockopt(
+                      socket.SOL_SOCKET,
+                      socket.SO_REUSEPORT, 1)
 
-          val=None
-          if family==socket.AF_INET:
-            assert "." in self.host
-            val=struct.pack("4sl",socket.inet_aton(self.host),
-                                                      socket.INADDR_ANY)
-          elif family==socket.AF_INET6:
+          val = None
+          if family == socket.AF_INET:
+              assert "." in self.host
+              val = struct.pack("4sl",
+                      socket.inet_aton(self.host), socket.INADDR_ANY)
+          elif family == socket.AF_INET6:
               raise NotImplementedError("IPv6 support not ready yet")
           else:
               raise ValueError("Unsupported network address family")
 
           self._sock.setsockopt(
-               socket.IPPROTO_IPV6 if self.ipv6 else socket.IPPROTO_IP,
-               socket.IP_ADD_MEMBERSHIP, val)
+                  socket.IPPROTO_IPV6 if self.ipv6 else socket.IPPROTO_IP,
+                  socket.IP_ADD_MEMBERSHIP, val)
           self._sock.setsockopt(
-               socket.IPPROTO_IPV6 if self.ipv6 else socket.IPPROTO_IP,
-               socket.IP_MULTICAST_LOOP, 0)
+                  socket.IPPROTO_IPV6 if self.ipv6 else socket.IPPROTO_IP,
+                  socket.IP_MULTICAST_LOOP, 0)
 
       self._decoders = {
           TYPE_VALUES         : self.decode_network_values,
@@ -200,8 +197,8 @@ class FromCollectd(X3Out):
 
 
     def decode_network_number(self,ptype, plen, buf):
-        """Decodes a number (64-bit unsigned) from collectd 
-           network format. """
+        """Decodes a number (64-bit unsigned) from collectd network format.
+        """
         return number.unpack_from(buf, header.size)[0]
 
 
@@ -212,22 +209,35 @@ class FromCollectd(X3Out):
 
 
     def decode_network_packet(self,buf):
-      """Decodes a network packet in collectd format."""
-      off=0
-      blen=len(buf)
-      while off<blen:
-        ptype,plen=header.unpack_from(buf, off)
-        if plen>blen-off:
-          raise ValueError("Packet longer than amount of data in buffer")
-        if ptype not in self._decoders:
-          raise ValueError("Message type %i not recognized" % ptype)
-        yield ptype, self._decoders[ptype](ptype, plen, buf[off:])
-        off += plen
+        """Decodes a network packet in collectd format."""
+        off=0
+        blen=len(buf)
+        while off<blen:
+            ptype,plen=header.unpack_from(buf, off)
+            if plen>blen-off:
+                raise ValueError("Packet longer than amount of data in buffer")
+            if ptype not in self._decoders:
+                raise ValueError("Message type %i not recognized" % ptype)
+            yield ptype, self._decoders[ptype](ptype, plen, buf[off:])
+            off += plen
 
     def skiplist(self,lizst):
       for item in lizst:
         if item:
           yield item
+
+    def rate(self,label,value):
+      rate=None
+      try:
+        derivateData=self.derive_cache[label]
+        valueDifference=value-derivateData[1]
+        timeDifference=self.packet_time-derivateData[0]
+        if timeDifference>0:
+          rate=valueDifference/timeDifference
+      except KeyError:
+        pass
+      self.derive_cache[label]=(self.packet_time,value)
+      return rate
 
     def cleanup_label(self,_label):
       try:
@@ -242,7 +252,7 @@ class FromCollectd(X3Out):
     def interpret_opcodes(self,iterable):
         labelPrefixParts=[None,None,None,None,None]
         for kind, data in iterable:
-          """ host.plugin(.plugin_instance).type(.type_instance) """
+          """ label prefix is host.plugin(.plugin_instance).type(.type_instance) """
           if kind==TYPE_HOST:
             labelPrefixParts[0]=data
           elif kind==TYPE_PLUGIN:
@@ -272,26 +282,43 @@ class FromCollectd(X3Out):
               else:
                 _label='%s.%s' % (prefix,valueTypeName)
               label=self.cleanup_label(_label)
-              yield (label,round(data[i][1],3))
+              """ depending on type, yield value and/or rate """
+              valueType=data[i][0]
+              value=round(data[i][1],3)
+              if valueType==DS_TYPE_DERIVE:
+                """  DERIVE value, just yield the rate """
+                rate=self.rate(label,value)
+                if rate!=None:
+                  yield ('%s.rate' % (label,),value) 
+              if valueType==DS_TYPE_COUNTER:
+                """ COUNTER value, yield the counter itself """
+                yield ('%s.count' % (label,),value)
+                rate=self.rate(label,value)
+                if rate!=None:
+                  """ COUNTER value, yield the rate as well """
+                  yield ('%s.rate' % (label,),rate)
+              elif valueType==DS_TYPE_GAUGE:
+                """ GAUGE value, just yield the value """
+                yield (label,value)
+              elif valueType==DS_TYPE_ABSOLUTE:
+                """ ABSOLUTE value, just yield the value """
+                yield (label,value)
               
     def read_types(self):
       self.types={}
       try:
         self.read_types_db(self.config['types.db'])
       except KeyError:
-        self.log("Can't Read types.db at [%s]!" % 
-                                              (self.config['types.db']))
+        self.log("Can't Read types.db at [%s]!" % (self.config['types.db']))
       try:
         self.read_types_db(self.config['types.db.custom'])
       except KeyError:
-        self.log("Can't Read types.db.custom at [%s]!" %
-                                        (self.config['types.db.custom']))
+        self.log("Can't Read types.db.custom at [%s]!" % (self.config['types.db.custom']))
 
     def read_types_db(self,path):
       td_expr=re.compile('^(?P<type>[a-z0-9_]+)\s+(?P<subtypes>.+)$')
       td_split_expr=re.compile('\s?,\s?')
-      td_sub_expr=re.compile('(?P<name>[a-z_]+):(?P<type>[A-Z]+):'
-                             '(?P<min>[0-9U-]+):(?P<max>[0-9U-]+)')
+      td_sub_expr=re.compile('(?P<name>[a-z_]+):(?P<type>[A-Z]+):(?P<min>[0-9U-]+):(?P<max>[0-9U-]+)')
       with open(path,'r') as typesdb:
         for line in typesdb:
           matches=td_expr.match(line)                         
@@ -302,8 +329,7 @@ class FromCollectd(X3Out):
             except KeyError:
               typedata=[]
               self.types[type]=typedata
-            for subtype in td_split_expr.split(matches.groupdict()
-                                                          ['subtypes']):
+            for subtype in td_split_expr.split(matches.groupdict()['subtypes']):
               matches=td_sub_expr.match(subtype)
               if matches:
                 typedata.append(matches.groupdict())
