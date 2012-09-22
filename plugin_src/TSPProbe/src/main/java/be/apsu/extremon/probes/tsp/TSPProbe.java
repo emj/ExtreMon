@@ -24,17 +24,37 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.net.URL;
 import java.net.URLConnection;
 import java.security.Security;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.cmp.PKIStatus;
 import org.bouncycastle.asn1.cms.AttributeTable;
+import org.bouncycastle.asn1.cryptopro.CryptoProObjectIdentifiers;
+import org.bouncycastle.asn1.oiw.OIWObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
+import org.bouncycastle.asn1.teletrust.TeleTrusTObjectIdentifiers;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.X509ObjectIdentifiers;
+import org.bouncycastle.asn1.x9.X9ObjectIdentifiers;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cms.CMSSignedDataGenerator;
 import org.bouncycastle.cms.SignerInformationVerifier;
 import org.bouncycastle.cms.jcajce.JcaSimpleSignerInfoVerifierBuilder;
 import org.bouncycastle.tsp.TSPAlgorithms;
@@ -44,12 +64,15 @@ import org.bouncycastle.tsp.TimeStampRequestGenerator;
 import org.bouncycastle.tsp.TimeStampResponse;
 import org.bouncycastle.tsp.TimeStampToken;
 import org.bouncycastle.tsp.TimeStampTokenInfo;
+import org.bouncycastle.util.Store;
+
 import be.apsu.extremon.plugin.X3Conf;
 import be.apsu.extremon.plugin.X3Log;
 import be.apsu.extremon.plugin.X3Out;
 
 public class TSPProbe 
 {
+	private static final String ALLOWED_SIGNATURE_CERTIFICATE_ALGORITHMS = "allowed.signature.certificate.algorithms";
 	// extremon config
 	final private X3Conf					config;
 	final private X3Out						out;
@@ -63,6 +86,8 @@ public class TSPProbe
 	final private Random					random;
 
 	private boolean							running;
+	private Set<String>						oidsAllowed;
+	private Map<String,String>				oidToName;
 
 	public TSPProbe() throws Exception
 	{
@@ -72,7 +97,8 @@ public class TSPProbe
 		this.delay=this.config.getInt("delay",1000);
 		this.prefix=this.config.get("prefix");
 		this.running=false;
-
+		getAllowedSignatureOIDs(this.config.get(ALLOWED_SIGNATURE_CERTIFICATE_ALGORITHMS).split(","));
+		
 		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 
 		url=new URL(this.config.get("url"));
@@ -81,7 +107,7 @@ public class TSPProbe
 		this.requestGenerator.setCertReq(true);
 		
 		CertificateFactory certificateFactory=CertificateFactory.getInstance("X.509");
-		String encodedCert=this.config.get("cert.tsa");
+		String encodedCert=this.config.get("tsa.certificate");
 		X509Certificate tsaCert=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(encodedCert)));
 		JcaSimpleSignerInfoVerifierBuilder verifierBuilder=new JcaSimpleSignerInfoVerifierBuilder();
 		this.signerVerifier=verifierBuilder.build(tsaCert);
@@ -108,22 +134,25 @@ public class TSPProbe
 		inputStream.close();
 		return response;
 	}
-	
-	
+		
 
 	public void run()
 	{
-		byte[] requestHashedMessage=new byte[64];
-		double start=0, end=0;
-		BigInteger requestNonce;
+		double 			start=0, end=0;
+		BigInteger 		requestNonce;
+		byte[] 			requestHashedMessage=new byte[20];
+		List<String> 	comments=new ArrayList<String>();
+		int				result=0;
+		
 		this.logger.log("running");
 		
 		this.running=true;
 		while(this.running)
 		{
+			comments.clear();
 			this.random.nextBytes(requestHashedMessage);
 			requestNonce=new BigInteger(512,this.random);
-			TimeStampRequest request=requestGenerator.generate(TSPAlgorithms.SHA512,requestHashedMessage,requestNonce);
+			TimeStampRequest request=requestGenerator.generate(TSPAlgorithms.SHA1,requestHashedMessage,requestNonce);
 			
 			end=0;
 			start=System.currentTimeMillis();
@@ -131,46 +160,94 @@ public class TSPProbe
 			try
 			{
 				TimeStampResponse response=probe(request);
+				
+				switch(response.getStatus())
+				{
+					case PKIStatus.GRANTED: 				comments.add("granted"); 						result=0; break;
+					case PKIStatus.GRANTED_WITH_MODS: 		comments.add("granted with modifications"); 	result=1; break;
+					case PKIStatus.REJECTION: 				comments.add("rejected"); 						result=2; break;
+					case PKIStatus.WAITING: 				comments.add("waiting"); 						result=2; break;
+					case PKIStatus.REVOCATION_WARNING: 		comments.add("revocation warning"); 			result=1; break;
+					case PKIStatus.REVOCATION_NOTIFICATION: comments.add("revocation notification"); 		result=2; break;
+					default: 								comments.add("response outside RFC3161"); 		result=2; break;
+				}
+				
+				if(response.getStatus()>=2)
+					comments.add(response.getFailInfo()!=null?response.getFailInfo().getString():"(missing failinfo)");
+				
+				if(response.getStatusString()!=null)
+					comments.add(response.getStatusString());
+	
 				end=System.currentTimeMillis();
 				TimeStampToken timestampToken=response.getTimeStampToken();
-				timestampToken.validate(this.signerVerifier);
-				AttributeTable table=timestampToken.getSignedAttributes();
 				
+				timestampToken.validate(this.signerVerifier);
+				comments.add("validated");
+				
+				AttributeTable table=timestampToken.getSignedAttributes();
 				TimeStampTokenInfo  tokenInfo=timestampToken.getTimeStampInfo();
 				BigInteger 			responseNonce=tokenInfo.getNonce();
 				byte[] 				responseHashedMessage=tokenInfo.getMessageImprintDigest();
 				long				genTimeSeconds=(tokenInfo.getGenTime().getTime())/1000;
 				long				currentTimeSeconds=(long)(start+((end-start)/2))/1000;
 				
+				this.out.put(this.prefix+".tspprobe.clockskew",(genTimeSeconds-currentTimeSeconds)*1000);
+				
+				if(Math.abs((genTimeSeconds-currentTimeSeconds))>1)
+				{
+					comments.add("clock skew > 1s");
+					result=2;
+				}
+				
+				Store responseCertificatesStore=timestampToken.toCMSSignedData().getCertificates();	
+				@SuppressWarnings("unchecked")
+				Collection<X509CertificateHolder> certs=responseCertificatesStore.getMatches(null);
+				for(X509CertificateHolder certificate : certs)
+				{
+					AlgorithmIdentifier sigalg=certificate.getSignatureAlgorithm();
+					if(!(oidsAllowed.contains(sigalg.getAlgorithm().getId())))
+					{
+						String cleanDn=certificate.getSubject().toString().replace("=", ":");
+						comments.add("signature cert \"" + cleanDn + "\" signed using " + getName(sigalg.getAlgorithm().getId()));
+						result=2;
+					}
+				}
+				
 				if(!responseNonce.equals(requestNonce))
 				{
-					error("Response has Incorrect Nonce");
+					comments.add("nonce modified");
+					result=2;
 				}
-				else if(!Arrays.equals(responseHashedMessage,requestHashedMessage))
+				
+				if(!Arrays.equals(responseHashedMessage,requestHashedMessage))
 				{
-					error("Response has Incorrect Hashed Message");
+					comments.add("hashed message modified");
+					result=2;
 				}
-				else if(table.get(PKCSObjectIdentifiers.id_aa_signingCertificate)==null)
+				
+				if(table.get(PKCSObjectIdentifiers.id_aa_signingCertificate)==null)
 				{
-					error("Response Is Missing SigningCertificate");
-				}
-				else
-				{
-					ok("granted and validated");
-					this.out.put(this.prefix+".tspprobe.clockskew",(genTimeSeconds-currentTimeSeconds)*1000);
+					comments.add("signingcertificate missing");
+					result=2;
 				}
 			}
 			catch(TSPException tspEx)
 			{
-				error("TSP Exception: " + tspEx.getMessage());
+				comments.add("validation failed");
+				comments.add("tspexception-" + tspEx.getMessage().toLowerCase());
+				result=2;
 			}
 			catch(IOException iox)
 			{
-				error("I/O Exception: " + iox.getMessage());
+				comments.add("unable to obtain response");
+				comments.add("ioexception-" + iox.getMessage().toLowerCase());
+				result=2;
 			}
 			catch(Exception ex)
 			{
-				error("Unexpected Exception: " + ex.getMessage() + " Please Fix TSPProbe to handle this properly.");
+				comments.add("unhandled exception");
+				comments.add("exception-" + ex.getMessage().toLowerCase());
+				result=2;
 			}
 			finally
 			{
@@ -178,8 +255,10 @@ public class TSPProbe
 					end=System.currentTimeMillis();
 			}
 
+			this.out.put(this.prefix+".tspprobe.result",result);
 			this.out.put(this.prefix+".tspprobe.responsetime",(end-start));
-
+			this.out.put(this.prefix+".tspprobe.result.comment",StringUtils.join(comments,"|"));
+			
 			try
 			{
 				Thread.sleep(this.delay);
@@ -191,21 +270,56 @@ public class TSPProbe
 		}
 	}
 	
-	private void error(String reason)
+	private String getName(String oid)
 	{
-		this.succeeds(false,reason);
+		String name=this.oidToName.get(oid);
+		if(name==null)
+			return oid;
+		return name;
 	}
 	
-	private void ok(String joy)
+	private void getAllowedSignatureOIDs(String[] names)
 	{
-		this.succeeds(true,joy);
-	}
-	
-	private void succeeds(boolean succeeds, String message)
-	{
-		this.out.put(this.prefix+".tspprobe.result",succeeds?"0":"1");
-		if(message!=null)
-			this.out.put(this.prefix+".tspprobe.result.comment",message.replace('=',':').replace('\n',' '));
+		oidsAllowed=new HashSet<String>();
+		oidToName=new HashMap<String,String>();
+		
+		for(Class<?> clazz: new Class[] {	X9ObjectIdentifiers.class,OIWObjectIdentifiers.class,
+									  		PKCSObjectIdentifiers.class,TeleTrusTObjectIdentifiers.class,
+									  		X509ObjectIdentifiers.class,CMSSignedDataGenerator.class,
+									  		CryptoProObjectIdentifiers.class})
+		{
+			for(Field field: clazz.getFields())
+			{
+				if(field.getType().equals(ASN1ObjectIdentifier.class) && field.getName().toLowerCase().contains("with"))
+				{
+					try
+					{
+						ASN1ObjectIdentifier identifier = (ASN1ObjectIdentifier)field.get(null);
+						String nameFound=field.getName().toLowerCase().replace("_","");
+						oidToName.put(identifier.getId(), nameFound);
+						
+						for(String name: names)
+						{
+							String nameAllowed=name.toLowerCase().replace("_","");
+							
+							if(nameAllowed.equals(nameFound))
+							{
+								oidsAllowed.add(identifier.getId());
+							}
+						}
+					}
+					catch (IllegalArgumentException e)
+					{
+						//
+					}
+					catch (IllegalAccessException e)
+					{
+						//
+					}
+					
+				}
+			}
+		}
 	}
 
 	public static void main(String[] args) throws Exception

@@ -42,6 +42,7 @@ import com.sun.xml.ws.client.ClientTransportException;
 
 public class XKMS2Probe
 {	
+	private static final String XKMS2_REASONURI_PREFIX = "http://www.w3.org/2002/03/xkms#";
 	private static final int DEFAULT_DELAY = 1000;
 	
 	// extremon config
@@ -115,14 +116,14 @@ public class XKMS2Probe
 			{
 				end=System.currentTimeMillis();
 				this.out.put(this.prefix+".state",2);
-				this.out.put(this.prefix+".state.comment","bad certificate encoding - check test configuration");
+				this.out.put(this.prefix+".state.comment","bad certificate encoding.");
 				this.logger.log("Certificate Encoding Exception (Configuration Problem?)");
 			}
 			catch(final TrustDomainNotFoundException ex)
 			{
 				end=System.currentTimeMillis();
 				this.out.put(this.prefix+".state",2);
-				this.out.put(this.prefix+".state.comment","trust domain [" + this.domain + "] not found - check test configuration");
+				this.out.put(this.prefix+".state.comment","trust domain [" + this.domain + "] not found.");
 				this.logger.log("Trust Domain Not Found (Configuration Problem?)");
 			}
 			catch(final ValidationFailedException ex)
@@ -145,12 +146,12 @@ public class XKMS2Probe
 				if(expected)
 				{
 					this.out.put(this.prefix+".state",0);
-					this.out.put(this.prefix+".state.comment","trust service rejects chain with [" + this.expectedFailure + "] (as it should)");
+					this.out.put(this.prefix+".state.comment","trust service rejects chain with [" + getPrintableReasons(ex.getReasons()) + "] (as it should)");
 				}
 				else
 				{
 					this.out.put(this.prefix+".state",2);
-					this.out.put(this.prefix+".state.comment","trust service rejects chain (expected validation!)");
+					this.out.put(this.prefix+".state.comment","trust service rejects chain with [" + getPrintableReasons(ex.getReasons()) + "] (expected validation!)");
 				}
 			}
 			catch(final ClientTransportException ex)
@@ -179,6 +180,22 @@ public class XKMS2Probe
 			}
 		}
 	}
+	
+	private String getPrintableReasons(final List<String> reasons)
+    {
+		final StringBuilder builder=new StringBuilder();
+        for(int i=0;i<reasons.size();i++)
+        {
+        	final String reason=reasons.get(i);
+            if(reason.startsWith(XKMS2_REASONURI_PREFIX))
+            {
+                builder.append(reason.substring(XKMS2_REASONURI_PREFIX.length()));
+                if(i<(reasons.size()-1))
+                	builder.append(',');
+            }
+        }		
+        return builder.toString();
+    }
 
 	public static void main(final String[] args) throws CertificateException
 	{
