@@ -45,35 +45,38 @@ class X3In(X3Log,X3Conf):
   def __init__(self,cache=False,capture=False):
     X3Log.__init__(self)
     X3Conf.__init__(self)
-    inshuttle={}
+    self.inshuttle={}
+    self.cache=cache
     if cache:
       self.cached={}
+    self.capture=capture
     if capture:
       self.regex=re.compile(self.config['in.filter'])
       self.captures={}
 
+  def receive_forever(self):
     try:
       for line in sys.stdin:
         if len(line)==1:
-          if len(inshuttle)>0:
-            if cache:
-              self.cached.update({label:value for (label,value) in inshuttle.items()})
-            if capture:
-              for (label,value) in inshuttle.items():
+          if len(self.inshuttle)>0:
+            if self.cache:
+              self.cached.update({label:value for (label,value) in self.inshuttle.items()})
+            if self.capture:
+              for (label,value) in self.inshuttle.items():
                 if label not in self.captures:
                   matches=self.regex.match(label)
                   if matches:
                     self.captures[label]=matches.groupdict()
                   else:
                     self.captures[label]=None
-              self.receive((label,value,self.captures[label]) for (label,value) in inshuttle.items())
+              self.receive([(label,value,self.captures[label]) for (label,value) in self.inshuttle.items()])
             else:
-              self.receive((label,value) for (label,value) in inshuttle.items())
-          inshuttle.clear()
+              self.receive([(label,value) for (label,value) in self.inshuttle.items()])
+          self.inshuttle.clear()
         else:
           try:
             (label,value)=line.rstrip().split('=')
-            inshuttle[label]=value
+            self.inshuttle[label]=value
           except ValueError:
             self.log("invalid record [%s]\n" % (line))
     except IOError:
@@ -102,3 +105,4 @@ class X3IO(X3In,X3Out):
   def __init__(self,cache=False,capture=False,max_shuttle_size=512,max_shuttle_age=.5):
     X3Out.__init__(self,max_shuttle_size=max_shuttle_size,max_shuttle_age=max_shuttle_age)
     X3In.__init__(self,cache=cache,capture=capture)
+    self.receive_forever()

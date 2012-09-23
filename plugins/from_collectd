@@ -82,6 +82,12 @@ class FromCollectd(X3Out):
 
     def __init__(self):
       X3Out.__init__(self,max_shuttle_size=512,max_shuttle_age=.1)
+      self.postprocesses={
+          re.compile(r'\.processes\.[a-z0-9_-]+\.ps_cputime\.'):
+                     self.post_process_plugin,
+          re.compile(r'\.cpu\.[0-9]+\.cpu'):
+                     self.post_clamp_percentage}
+
       self.ip_address_pattern=re.compile(r"(25[0-5]|2[0-4][0-9]|[01]?"
       "[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\."
       "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\."
@@ -90,7 +96,8 @@ class FromCollectd(X3Out):
       self.zapgremlins_pattern=re.compile(self.config['zapgremlins'])
       self.read_types()
       self.labels={}
-      self.counters=set()
+      self.derive_cache={}
+      self.postprocess_cache={}
 
       host=self.config['host']
       port=int(self.config['port'])
@@ -150,7 +157,22 @@ class FromCollectd(X3Out):
 
       while True:
         for item in self.interpret():
-          self.put(item[0],item[1])
+          label=item[0]
+          post_fn=None
+          try:
+            post_fn=self.postprocess_cache[label]
+          except KeyError:
+            for matcher, fn in self.postprocesses.items():
+              if matcher.search(label):
+                post_fn=fn
+                break
+            self.postprocess_cache[label]=post_fn
+
+          if post_fn!=None:
+            self.put(label,post_fn(item[1]))
+          else:
+            self.put(label,item[1])
+
 
     def decode(self, buf=None):
         """Decodes a given buffer or the next received packet.
@@ -224,6 +246,14 @@ class FromCollectd(X3Out):
         yield ptype, self._decoders[ptype](ptype, plen, buf[off:])
         off += plen
 
+    def post_clamp_percentage(self,data):
+      if data>100.0:
+        return 100.0
+      return data
+  
+    def post_process_plugin(self,data):
+      return self.post_clamp_percentage(data/10000.0)
+
     def skiplist(self,lizst):
       for item in lizst:
         if item:
@@ -272,8 +302,21 @@ class FromCollectd(X3Out):
               else:
                 _label='%s.%s' % (prefix,valueTypeName)
               label=self.cleanup_label(_label)
-              yield (label,round(data[i][1],3))
-              
+              valueType=data[i][0]
+              value=data[i][1]
+              if valueType==DS_TYPE_DERIVE:
+                try:
+                  derivateData=self.derive_cache[label]
+                  timeDifference=self.packet_time-derivateData[0]
+                  if timeDifference>0:
+                    derived=(value-derivateData[1])/timeDifference
+                    yield (label,derived)
+                except KeyError:
+                  pass 
+                self.derive_cache[label]=(self.packet_time,value)
+              else:
+                yield (label,round(data[i][1],3))
+
     def read_types(self):
       self.types={}
       try:
