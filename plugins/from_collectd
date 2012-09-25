@@ -5,7 +5,8 @@
 #x3.host=224.0.0.1
 #x3.port=1250
 #x3.multicast=yes
-#x3.out.filter=^(be\.fedict|be\.apsu|be\.colifra)\.
+#x3.ignore=(ocspprobe|httpprobe|dnsprobe|notafterprobe|tslprobe|xkms2probe)
+#x3.out.filter=^be\.(fedict|apsu|colifra)\.
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -98,6 +99,13 @@ class FromCollectd(X3Out):
       self.labels={}
       self.derive_cache={}
       self.postprocess_cache={}
+
+      try:
+        self.ignore_pattern=re.compile(self.config['ignore'])
+        self.ignore_cache={}
+      except KeyError:
+        self.ignore_cache=None
+        pass
 
       host=self.config['host']
       port=int(self.config['port'])
@@ -273,14 +281,17 @@ class FromCollectd(X3Out):
         labelPrefixParts=[None,None,None,None,None]
         for kind, data in iterable:
           """ host.plugin(.plugin_instance).type(.type_instance) """
+          pluginInstanceName=None
           if kind==TYPE_HOST:
             labelPrefixParts[0]=data
           elif kind==TYPE_PLUGIN:
-            labelPrefixParts[1]=data
+            pluginName=data
+            labelPrefixParts[1]=pluginName
             labelPrefixParts[2]=None
           elif kind==TYPE_PLUGIN_INSTANCE:
             if data!=labelPrefixParts[1]:
-              labelPrefixParts[2]=data
+              pluginInstanceName=data
+              labelPrefixParts[2]=pluginInstanceName
           elif kind==TYPE_TYPE:
             dataType=data
             labelPrefixParts[3]=data
@@ -302,6 +313,15 @@ class FromCollectd(X3Out):
               else:
                 _label='%s.%s' % (prefix,valueTypeName)
               label=self.cleanup_label(_label)
+              """ if label matches ignores, don't output """
+              if self.ignore_cache!=None:
+                ignore=False
+                try:
+                  ignore=self.ignore_cache[label]
+                except KeyError:
+                  self.ignore_cache[label]=self.ignore_pattern.search(label)!=None
+                if ignore:
+                  return
               valueType=data[i][0]
               value=data[i][1]
               if valueType==DS_TYPE_DERIVE:

@@ -8,7 +8,7 @@
 #x3.prefix=be.fedict.eid.prod.trust.validauthcertchain
 #x3.url=https://trust-ws.services.belgium.be/eid-trust-service-ws/xkms2
 #x3.delay=1000
-#x3.out.filter=be\.fedict\.eid\.prod\.trust\.validauthcertchain\.xkms2probe\.(result|responsetime|result\.comment)$
+#x3.out.filter=be\.fedict\.eid\.prod\.trust\.validauthcertchain\.(responsetime|result|result\.comment)$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien

@@ -1,0 +1,78 @@
+#!/usr/bin/python3
+#x3.alert.threshold=1000
+#x3.warning.threshold=500
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+)\.(?P<measure>responsetime|result|result\.comment|responsetime\.average)$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.(state|state\.comment)$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+
+class ResponseTimeState(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,cache=True,capture=True)
+    self.warning_threshold=float(self.config['warning.threshold'])
+    self.alert_threshold=float(self.config['alert.threshold'])
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    comments=[]
+    for (label,value,captures) in shuttle:
+      try:
+        prefix=captures['prefix']
+        measure=captures['measure']
+        ''' result and responsetime are required, skip if missing ''' 
+        try: 
+          result      =int(float(self.cached['%s.result'    % (prefix)]))
+          responsetime=float(self.cached['%s.responsetime' % (prefix)])
+        except KeyError:
+          break
+        ''' comment is optional, use if available '''
+        try:
+          comments.append(self.cached['%s.result.comment' % (prefix)])
+        except KeyError:
+          pass
+        ''' average is optional, use if available '''
+        try:
+          average=float(self.cached['%s.responsetime.average' % (prefix)])
+        except KeyError:
+          average=None
+        if responsetime>self.alert_threshold:
+          rresult=2 
+          comments.append('response time alert (>%.0f)' % (self.alert_threshold))
+        elif responsetime>self.warning_threshold: 
+          rresult=1
+          comments.append('response time warning (>%.0f)' % (self.warning_threshold))
+        elif average!=None and responsetime>(average*2.0):
+          rresult=1
+          comments.append('response time warning (> 200% of average)')
+        else:
+          rresult=0
+          comments.append('response time ok')
+        self.put('%s.state' % (prefix),max(result,rresult))
+        self.put('%s.state.comment' % (prefix),'|'.join(comments))
+        del comments[:]
+
+      except KeyError:
+        self.log("prefix or measure missing. fix plugin")
+        break
+
+ResponseTimeState()

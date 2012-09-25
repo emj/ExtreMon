@@ -1,0 +1,63 @@
+#!/usr/bin/python3
+#x3.prefix=be.fedict.eid.ext.globalsign.dns
+#x3.delay=1000
+#x3.a.query=secure.globalsign.net
+#x3.expected.a.records=64.18.25.16,108.162.193.74,108.162.193.174
+#x3.out.filter=^be\.fedict\.eid\.ext\.globalsign\.dns\.(state|state\.comment)$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import dns.resolver
+import time,sys,os
+from x3plugin import X3Out
+
+class DNSProbe(X3Out):
+  def __init__(self):
+    self.log("running")
+    X3Out.__init__(self)
+    self.prefix=self.config['prefix']
+    self.delay=float(self.config['delay'])/1000.0
+    self.aquery=self.config['a.query']
+    self.expected=self.config['expected.a.records'].split(',')
+    while True:
+      try:
+        ok=True
+        answers=dns.resolver.query(self.aquery, 'A')
+        for rdata in answers:
+          if not rdata.to_text() in self.expected:
+            ok=False
+            break
+        if ok:
+            self.put('%s.state' % (self.prefix),'0')
+            self.put('%s.state.comment' % (self.prefix),'ok, secure.globalsign.net within [%s]' % (self.config['expected.a.records']))
+        else:
+            self.put('%s.state' % (self.prefix),'2')
+            self.put('%s.state.comment' % (self.prefix),'alert, secure.globalsign.net no longer within [%s]' % (self.config['expected.a.records']))
+      except:
+        self.put('%s.result' % (self.prefix),'1')
+        self.put('%s.state.comment' % (self.prefix),'DNS probe fails to get results.. please fix me')
+        self.log("DNS Probe Failed:%s\n" % str(sys.exc_info()))
+      time.sleep(self.delay)
+
+if __name__=='__main__':
+  DNSProbe()
+
+

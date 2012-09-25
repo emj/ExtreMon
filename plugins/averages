@@ -30,6 +30,7 @@ class Averages(X3IO):
     self.log("running")
     self.cmas=shelve.open('averages.db')
     X3IO.__init__(self)
+    self.receive_forever()
 
   def receive(self,shuttle):
     for (label,_value) in shuttle:

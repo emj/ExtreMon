@@ -1,0 +1,67 @@
+#!/usr/bin/python3
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.cpu\.[0-9]+\.cpu)\.(?P<measure>idle|interrupt|nice|softirq|steal|system|user|wait)$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.cpu\.[0-9]+\.cpu)\.(?P<measure>idle|interrupt|nice|softirq|steal|system|user|wait)\.state$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+import re
+
+class CPUState(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,capture=True)
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    for (label,value,captures) in shuttle:
+      value=float(value)
+      prefix=captures['prefix']
+      measure=captures['measure']
+      if measure=='idle':
+        if value<50:
+          self.put('%s.%s.state' % (prefix,measure),'2')
+        elif value<75:
+          self.put('%s.%s.state' % (prefix,measure),'1')
+        else:
+          self.put('%s.%s.state' % (prefix,measure),'0')
+      elif measure in ['interrupt','softirq','steal']:
+        if value>2:
+          self.put('%s.%s.state' % (prefix,measure),'2')
+        elif value>1:
+          self.put('%s.%s.state' % (prefix,measure),'1')
+        else:
+          self.put('%s.%s.state' % (prefix,measure),'0')
+      elif measure in ['system','user']:
+        if value>50:
+          self.put('%s.%s.state' % (prefix,measure),'2')
+        elif value>25:
+          self.put('%s.%s.state' % (prefix,measure),'1')
+        else:
+          self.put('%s.%s.state' % (prefix,measure),'0')
+      elif measure=='wait':
+        if value>10:
+          self.put('%s.%s.state' % (prefix,measure),'2')
+        elif value>5:
+          self.put('%s.%s.state' % (prefix,measure),'1')
+        else:
+          self.put('%s.%s.state' % (prefix,measure),'0')
+
+CPUState()

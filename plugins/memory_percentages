@@ -27,6 +27,7 @@ class MEM(X3IO):
   def __init__(self):
     self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
+    self.receive_forever()
 
   def receive(self,shuttle):
     for (label,value,captures) in shuttle:

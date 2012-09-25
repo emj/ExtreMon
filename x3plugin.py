@@ -105,4 +105,3 @@ class X3IO(X3In,X3Out):
   def __init__(self,cache=False,capture=False,max_shuttle_size=512,max_shuttle_age=.5):
     X3Out.__init__(self,max_shuttle_size=max_shuttle_size,max_shuttle_age=max_shuttle_age)
     X3In.__init__(self,cache=cache,capture=capture)
-    self.receive_forever()

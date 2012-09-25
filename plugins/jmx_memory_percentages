@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.jmx_memory)\.(init|committed|used|max)\.value$
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.jmx_memory)\.(init|committed|used|max)$
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.jmx_memory)\.(init|committed|used|max)\.percentage$
 
 #   ExtreMon Project
@@ -29,19 +29,19 @@ class JAVAMEM(X3IO):
   def __init__(self):
     self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
+    self.receive_forever()
 
   def receive(self,shuttle):
     for (label,value,captures) in shuttle:
       try:
         prefix=captures['prefix']
-        init=float(self.cached['%s.init.value' % (prefix)])
-        committed=float(self.cached['%s.committed.value' % (prefix)])
-        used=float(self.cached['%s.used.value' % (prefix)])
-        max=float(self.cached['%s.max.value' % (prefix)])
+        init=float(self.cached['%s.init' % (prefix)])
+        committed=float(self.cached['%s.committed' % (prefix)])
+        used=float(self.cached['%s.used' % (prefix)])
+        max=float(self.cached['%s.max' % (prefix)])
         self.put('%s.init.percentage' % (prefix),((init/max)*100.0))
         self.put('%s.committed.percentage' % (prefix),((committed/max)*100.0))
         self.put('%s.used.percentage' % (prefix),((used/max)*100.0))
-        self.put('%s.max.percentage' % (prefix),'100.0')
       except KeyError:
         pass
 
