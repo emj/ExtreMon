@@ -1,7 +1,7 @@
 #!/usr/bin/python3
-#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.httpprobe)\.(result|responsetime)$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.httpprobe)\.(result|responsetime|result\.comment)$
 #x3.prefix=be.fedict.eid
-#x3.timeout=10.0
+#x3.timeout=10
 #x3.interval=1.0
 
 #   ExtreMon Project
@@ -25,13 +25,18 @@
 #
 
 import socket
-socket.setdefaulttimeout(10)
 import urllib.request,time,datetime,sys,os,socket,json
 from threading import Thread
 from queue import Queue
 from x3plugin import X3Out
 #------------------------------------------------------------------------
 
+
+# 
+# Tzury Bar Yochay
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, hdrs, newurl):
+        pass
 
 # thanks to Carles Barrobes
 # http://stackoverflow.com/questions/110498/
@@ -58,32 +63,55 @@ class ResponseTimeProbe(Thread):
     self.timeout=timeout
     self.handler=handler
     urllib.request.install_opener(
-                        urllib.request.build_opener(NoRedirectHandler()))
+                        urllib.request.build_opener(NoRedirect))
 
   def run(self):
     self.running=True
+    diag=[]
+    result=0
     while self.running:
       start=time.time()
       try:
-        socket=urllib.request.urlopen(self.config['url'],
-                                                    timeout=self.timeout)
+        socket=urllib.request.urlopen(self.config['url'], timeout=self.timeout)
+        diag.append('connection ok')
         data=socket.read()
-        success=(data.find(self.config['expect_text'])!=-1 
-                              if 'expect_text' in self.config else True)
-
+        if len(data)>0:
+            diag.append('read %d bytes' % (len(data)))
+        else:
+            diag.append('no data')
+            result=2
+        try:
+            if data.find(self.config['expect_text'])==-1:
+              diag.append('expected text [%s] not found' % (self.config['expect_text']))
+              result=2
+            else:
+              diag.append('expected text ok')
+        except KeyError:
+            pass
       except urllib.error.HTTPError as response:
-        success=(response.code==self.config['expected_code'] 
-                            if 'expected_code' in self.config else False)
+        try:
+            if response.code!=self.config['expect_code']:
+              diag.append('expected response [%d] but got [%d]' % (self.config['expect_code'],response.code))
+              result=2
+            else:
+              diag.append('response code ok');
+        except KeyError:
+            pass
+      except urllib.error.URLError as urlError:
+        if len(urlError.reason)>0:
+          diag.append('url error %s' % (urlError.reason))
+        else:
+          diag.append("urlerror")
+        result=2
       except:
-        success=False
-      self.handler.put("%s.%s.httpprobe.responsetime" % (
-                                            self.handler.prefix,
-                                            self.id),
-                                            (time.time()-start)*1000.0)
+        diag.append('general error')
+        result=2
+      
+      self.handler.put("%s.%s.httpprobe.responsetime" % (self.handler.prefix, self.id), (time.time()-start)*1000.0)
+      self.handler.put("%s.%s.httpprobe.result" % (self.handler.prefix, self.id),result)
+      self.handler.put('%s.%s.httpprobe.result.comment' % (self.handler.prefix,self.id), '|'.join(diag))
 
-      self.handler.put("%s.%s.httpprobe.result" % (self.handler.prefix,
-                                                   self.id),
-                                                '1' if success else '0')
+      del diag[:]                               
       time.sleep(self.interval)
 
   def stop(self):
@@ -92,10 +120,12 @@ class ResponseTimeProbe(Thread):
 class ResponseTimeProbes(X3Out):
   def __init__(self,patients):
     X3Out.__init__(self)
+    socket.setdefaulttimeout(int(self.config['timeout']))
     self.patients=patients
     self.interval=float(self.config['interval'])
     self.timeout=float(self.config['timeout'])
     self.prefix=self.config['prefix']
+    socket.setdefaulttimeout(int(self.timeout))
 
     for (id,patient) in self.patients.items():
       try:
@@ -109,6 +139,7 @@ class ResponseTimeProbes(X3Out):
                         timeout=self.timeout,
                         prefix=self.prefix,
                         handler=self).start()
+    self.log('running')
     while True:
       time.sleep(10)
 

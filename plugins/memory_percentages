@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.jmx_memory)\.(init|committed|used|max)$
-#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.jmx_memory)\.(init|committed|used|max)\.percentage$
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)\.value$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)\.percentage$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -21,11 +21,9 @@
 #   You should have received a copy of the GNU General Public License
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
-
-import re
 from x3plugin import X3IO
 
-class JAVAMEM(X3IO):
+class MEM(X3IO):
   def __init__(self):
     self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
@@ -35,16 +33,15 @@ class JAVAMEM(X3IO):
     for (label,value,captures) in shuttle:
       try:
         prefix=captures['prefix']
-        init=float(self.cached['%s.init' % (prefix)])
-        committed=float(self.cached['%s.committed' % (prefix)])
-        used=float(self.cached['%s.used' % (prefix)])
-        max=float(self.cached['%s.max' % (prefix)])
-        self.put('%s.init.percentage' % (prefix),((init/max)*100.0))
-        self.put('%s.committed.percentage' % (prefix),((committed/max)*100.0))
-        self.put('%s.used.percentage' % (prefix),((used/max)*100.0))
+        used=float(self.cached['%s.used.value' % (prefix)])
+        free=float(self.cached['%s.free.value' % (prefix)])
+        cached=float(self.cached['%s.cached.value' % (prefix)])
+        buffered=float(self.cached['%s.buffered.value' % (prefix)])
+        total=used+free+cached+buffered
+        self.put('%s.used.percentage' % (prefix),((used/total)*100.0))
+        self.put('%s.free.percentage' % (prefix),((free/total)*100.0))
+        self.put('%s.cached.percentage' % (prefix),((cached/total)*100.0))
+        self.put('%s.buffered.percentage' % (prefix),((buffered/total)*100.0))
       except KeyError:
         pass
-
-JAVAMEM()
-  
-
+MEM()

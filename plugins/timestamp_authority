@@ -1,0 +1,30 @@
+#!/bin/bash
+#x3.allowed.signature.certificate.algorithms=sha1WithRSAEncryption
+#x3.prefix=be.fedict.eid.ext.tsa
+#x3.url=http://tsa.belgium.be/connect
+#x3.tsa.certificate=MIIEBTCCAu2gAwIBAgILBAAAAAABM8/Iw00wDQYJKoZIhvcNAQEFBQAwKDELMAkGA1UEBhMCQkUxGTAXBgNVBAMTEEJlbGdpdW0gUm9vdCBDQTIwHhcNMTExMTIzMTEwMDAwWhcNMTcwMjIzMTEwMDAwWjBjMSMwIQYDVQQKExpCZWxnaXVtIEZlZGVyYWwgR292ZXJubWVudDENMAsGA1UEBRMEMjAxMjELMAkGA1UEBhMCQkUxIDAeBgNVBAMTF1RpbWUgU3RhbXBpbmcgQXV0aG9yaXR5MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzqVWIxX4aItTWtqgnf5chatfJmPe3u8oa5l9t0coQSQsczZRe/qc68mzBzoFztuUX3ozjrHLfXMXE8qoVcjDInf8+6/SCYMAOfDQe1T49zP5rvX0xdRgykTiUnGwSyBKbmzzKQj+hjPsRkzF3ohlOGnKSngCa4KS/Td4gSIa1nbwgL9hRoSntlaTdxe0VtUeYutwdOKoOzbJWs3mwp7pMyUtX4gHl7V+l5vSOYnJ9MVj9GtCPeD41JWxdRfHKL1uvr9oElBhRwD+7jwsoltug2xg++twcSey9lMD6RS/8TIPQ+P0eClOmxjibFXZfni9H+2pUZAY3ivnGV8q94CUVQIDAQABo4H0MIHxMA4GA1UdDwEB/wQEAwIGwDAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDBDBgNVHSAEPDA6MDgGBmA4CQEBBTAuMCwGCCsGAQUFBwIBFiBodHRwOi8vcmVwb3NpdG9yeS5wa2kuYmVsZ2l1bS5iZTAdBgNVHQ4EFgQU9ERQnR4jS8vQpnZuQkkDBNhpTK0wNwYDVR0fBDAwLjAsoCqgKIYmaHR0cDovL2NybC5wa2kuYmVsZ2l1bS5iZS9iZWxnaXVtMi5jcmwwCQYDVR0TBAIwADAfBgNVHSMEGDAWgBSFiuv0xbu+DlkDlN7WgAEV4xCcOTANBgkqhkiG9w0BAQUFAAOCAQEAh/ncgUt1mUgqKkOoz9C3Erj5tzuiCg/tEUm5cw1t29kCc3mZmmEeBq4j5AxN7Yo4olo+gMyv2uKil0Y3m8Ons7s2ZVR27G9+xq/Uc1pUdrAkCE7C4N+LC7oYk5jfqHZQUhrC8frwW5FqQ7UQZdWq9OBWahjxXtTC5Rh/p9/cGzulr0p6Fas+veBEznobjbin7QSfCSuAJVub2mu2Rt/ZE6SOqHkLvAgv2wj1by0+13XhrzyGZfDzePQATysC8WNW/+MQ+u9PZnYzLSDqGR8HNI0Dha5aQKxbsbHCLixXIKZCgXACLe7xiUjgCh1tFL6Wi08Tt1n+eAlDFCYmT9b3cg==
+#x3.delay=10000
+#x3.out.filter=be\.fedict\.eid\.ext\.tsa\.(responsetime|result|result\.comment|clockskew)$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+exec </dev/null
+exec java -jar tspprobe.jar

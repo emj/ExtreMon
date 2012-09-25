@@ -160,7 +160,7 @@ class CauldronReceiver:
 
 
   def receive_shuttle(self):
-    data=self.socket.recv(16384)
+    data=self.socket.recv(131072)
     for line in str(data,'UTF-8').splitlines():
       if len(line)>0:
           labelAndValue=line.split('=')
@@ -293,8 +293,8 @@ class CauldronServer(Thread):
   def scatter_shuttle(self):
     with self.consumers_lock:
       for consumer in self.consumers:
-        consumer.write(   bytes('%s\n\n' % ('\n'.join(self.shuttle)),
-                         'UTF-8'))
+        consumer.write(bytes('%s\n\n' % ('\n'.join(self.shuttle)),
+                       'UTF-8'))
       self.sequence+=1
 
   def add_consumer(self,consumer):
@@ -327,7 +327,7 @@ class ChaliceServer(CauldronServer):
   
   def dump_cache(self,consumer):
     with self.cache_lock:
-      consumer.write(bytes('%s\n' % ('\n'.join(['%s=%s' % (label,value)
+      consumer.write(bytes('%s\n\n' % ('\n'.join(['%s=%s' % (label,value)
              for (label,value) in self.cache.items()])),'UTF-8'))
 
   def __init__(self,prefix):

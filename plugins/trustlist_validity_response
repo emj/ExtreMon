@@ -8,7 +8,7 @@
 #x3.validity.warning.threshold=3628800
 #x3.validity.error.comment=Valid For Less Than 2 Weeks! If No Signing Ceremony Occurred, Validity Will Expire Before Replacement!!
 #x3.validity.error.threshold=1209600
-#x3.out.filter=^be\.fedict\.eid\.ext\.tsl\.tslprobe\.(result\.state|result\.comment|responsetime|validityleft)$
+#x3.out.filter=^be\.fedict\.eid\.ext\.tsl\.(result|result\.comment|responsetime|validityleft)$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -64,23 +64,23 @@ class TSLProbe(X3Out):
 
         secondsUntilNextUpdate=int(timeUntilNextUpdate.total_seconds())
 
-        self.put('%s.tslprobe.responsetime' % (self.prefix),'%.2f' % ((end-start)*1000.0))
-        self.put('%s.tslprobe.validityleft' % (self.prefix),secondsUntilNextUpdate)
+        self.put('%s.responsetime' % (self.prefix),'%.2f' % ((end-start)*1000.0))
+        self.put('%s.validityleft' % (self.prefix),secondsUntilNextUpdate)
 
         if secondsUntilNextUpdate<self.validityErrorTresh:
-          self.put('%s.tslprobe.result.state' % (self.prefix),2)
-          self.put('%s.tslprobe.result.comment' % (self.prefix),self.validityErrorComment)
+          self.put('%s.result' % (self.prefix),2)
+          self.put('%s.result.comment' % (self.prefix),self.validityErrorComment)
         elif secondsUntilNextUpdate<self.validityWarnTresh:
-          self.put('%s.tslprobe.result.state' % (self.prefix),1)
-          self.put('%s.tslprobe.result.comment' % (self.prefix),self.validityWarnComment)
+          self.put('%s.result' % (self.prefix),1)
+          self.put('%s.result.comment' % (self.prefix),self.validityWarnComment)
         else:
-          self.put('%s.tslprobe.result.state' % (self.prefix),0)
-          self.put('%s.tslprobe.result.comment' % (self.prefix),self.okComment)
+          self.put('%s.result' % (self.prefix),0)
+          self.put('%s.result.comment' % (self.prefix),self.okComment)
 
         time.sleep(self.delay)
       except:
-        self.put('%s.tslprobe.result.state' % (self.prefix),2)
-        self.put('%s.tslprobe.result.comment' % (self.prefix),self.errorComment)
+        self.put('%s.result' % (self.prefix),2)
+        self.put('%s.result.comment' % (self.prefix),self.errorComment)
 
 if __name__=='__main__':
   TSLProbe()

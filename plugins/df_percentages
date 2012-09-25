@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.df_complex)\.(free|reserved|used)\.value$
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.df_complex)\.(free|reserved|used)$
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.df_complex)\.(free|reserved|used)\.percentage$
 
 #   ExtreMon Project
@@ -27,14 +27,15 @@ class DF(X3IO):
   def __init__(self):
     self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
+    self.receive_forever()
 
   def receive(self,shuttle):
     for (label,value,captures) in shuttle:
       try:
         prefix=captures['prefix']
-        free=float(self.cached['%s.free.value' % (prefix)])
-        reserved=float(self.cached['%s.reserved.value' % (prefix)])
-        used=float(self.cached['%s.used.value' % (prefix)])
+        free=float(self.cached['%s.free' % (prefix)])
+        reserved=float(self.cached['%s.reserved' % (prefix)])
+        used=float(self.cached['%s.used' % (prefix)])
         total=free+reserved+used
         self.put('%s.free.percentage' % (prefix),((free/total)*100.0))
         self.put('%s.reserved.percentage' % (prefix),((reserved/total)*100.0))

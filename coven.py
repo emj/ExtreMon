@@ -92,7 +92,7 @@ class CauldronToPlugin(Thread,Countable):
 
     if len(self.accu)>0:
       try:
-        databytes=(bytes('%s\n' % ('\n\n'.join(self.accu)),'utf-8'))
+        databytes=(bytes('%s\n\n' % ('\n'.join(self.accu)),'utf-8'))
         self.plugin.write(databytes)
         self.count('bytes_per_second',len(databytes))
         self.count('shuttles_per_second',1)
@@ -123,7 +123,7 @@ class PluginToCauldron(Thread,Countable):
   def run(self):
     self.running=True
     self.log("running")
-    self.cauldron=CauldronSender(self.cauldronAddr)
+    self.cauldron=CauldronSender(self.cauldronAddr,max_shuttle_size=512,max_shuttle_age=.2)
     for recordBytes in self.plugin:
       if not self.running:
         return
@@ -216,7 +216,7 @@ class Plugin(Thread):
                                self.process.stdout,
                                log=self.out_log,
                                outFilter=self.config.get('out.filter'))
-    self.p2c.start()
+      self.p2c.start()
 
     ''' in this thread, read stderr, and log output '''
     for line in self.process.stderr:
@@ -262,7 +262,7 @@ class Plugin(Thread):
 
 class Coven(object):
   def __init__( self,path,prefix,cauldronAddr,
-                ignore=[r'^\.',r'\.x?swp$',r'~',r'^__',r'__$',r'\.jar$']):
+      ignore=[r'^\.',r'\.x?swp$',r'~',r'^__',r'__$',r'\.jar$',r'\.db$']):
     syslog.openlog(ident="X3Coven",facility=syslog.LOG_DAEMON)
     self.path=path
     self.prefix=prefix
