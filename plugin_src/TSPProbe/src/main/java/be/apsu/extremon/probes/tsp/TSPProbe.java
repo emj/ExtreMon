@@ -66,19 +66,14 @@ import org.bouncycastle.tsp.TimeStampToken;
 import org.bouncycastle.tsp.TimeStampTokenInfo;
 import org.bouncycastle.util.Store;
 
-import be.apsu.extremon.plugin.X3Conf;
-import be.apsu.extremon.plugin.X3Log;
 import be.apsu.extremon.plugin.X3Out;
 
-public class TSPProbe 
+public class TSPProbe extends X3Out
 {
+	private static final int 	DEFAULT_DELAY 							 = 1000;
 	private static final String ALLOWED_SIGNATURE_CERTIFICATE_ALGORITHMS = "allowed.signature.certificate.algorithms";
-	// extremon config
-	final private X3Conf					config;
-	final private X3Out						out;
-	final private X3Log						logger;
+
 	// probe config
-	final private String					prefix;
 	final private int						delay;
 	final private TimeStampRequestGenerator requestGenerator;
 	final private URL						url;
@@ -91,31 +86,27 @@ public class TSPProbe
 
 	public TSPProbe() throws Exception
 	{
-		this.logger=new X3Log();
-		this.config=new X3Conf();
-		this.out=new X3Out();
-		this.delay=this.config.getInt("delay",1000);
-		this.prefix=this.config.get("prefix");
+		this.delay=confInt("delay",DEFAULT_DELAY);
 		this.running=false;
-		getAllowedSignatureOIDs(this.config.get(ALLOWED_SIGNATURE_CERTIFICATE_ALGORITHMS).split(","));
+		getAllowedSignatureOIDs(confStr(ALLOWED_SIGNATURE_CERTIFICATE_ALGORITHMS).split(","));
 		
 		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 
-		url=new URL(this.config.get("url"));
+		url=new URL(confStr("url"));
 		
 		this.requestGenerator=new TimeStampRequestGenerator();
 		this.requestGenerator.setCertReq(true);
 		
 		CertificateFactory certificateFactory=CertificateFactory.getInstance("X.509");
-		String encodedCert=this.config.get("tsa.certificate");
+		String encodedCert=confStr("tsa.certificate");
 		X509Certificate tsaCert=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(encodedCert)));
 		JcaSimpleSignerInfoVerifierBuilder verifierBuilder=new JcaSimpleSignerInfoVerifierBuilder();
 		this.signerVerifier=verifierBuilder.build(tsaCert);
 		
 		this.random=new Random();
 		
-		this.out.start();
-		this.logger.log("Initialized");
+		start();
+		log("initialized");
 	}
 
 	private TimeStampResponse probe(TimeStampRequest request) throws IOException, TSPException
@@ -136,15 +127,15 @@ public class TSPProbe
 	}
 		
 
-	public void run()
+	public void probe_forever()
 	{
 		double 			start=0, end=0;
 		BigInteger 		requestNonce;
 		byte[] 			requestHashedMessage=new byte[20];
 		List<String> 	comments=new ArrayList<String>();
-		int				result=0;
+		STATE			result=STATE.MISSING;
 		
-		this.logger.log("running");
+		log("running");
 		
 		this.running=true;
 		while(this.running)
@@ -163,13 +154,13 @@ public class TSPProbe
 				
 				switch(response.getStatus())
 				{
-					case PKIStatus.GRANTED: 				comments.add("granted"); 						result=0; break;
-					case PKIStatus.GRANTED_WITH_MODS: 		comments.add("granted with modifications"); 	result=1; break;
-					case PKIStatus.REJECTION: 				comments.add("rejected"); 						result=2; break;
-					case PKIStatus.WAITING: 				comments.add("waiting"); 						result=2; break;
-					case PKIStatus.REVOCATION_WARNING: 		comments.add("revocation warning"); 			result=1; break;
-					case PKIStatus.REVOCATION_NOTIFICATION: comments.add("revocation notification"); 		result=2; break;
-					default: 								comments.add("response outside RFC3161"); 		result=2; break;
+					case PKIStatus.GRANTED: 				comments.add("granted"); 						result=STATE.OK; 		break;
+					case PKIStatus.GRANTED_WITH_MODS: 		comments.add("granted with modifications"); 	result=STATE.WARNING; 	break;
+					case PKIStatus.REJECTION: 				comments.add("rejected"); 						result=STATE.ALERT; 	break;
+					case PKIStatus.WAITING: 				comments.add("waiting"); 						result=STATE.ALERT; 	break;
+					case PKIStatus.REVOCATION_WARNING: 		comments.add("revocation warning"); 			result=STATE.WARNING; 	break;
+					case PKIStatus.REVOCATION_NOTIFICATION: comments.add("revocation notification"); 		result=STATE.ALERT; 	break;
+					default: 								comments.add("response outside RFC3161"); 		result=STATE.ALERT; 	break;
 				}
 				
 				if(response.getStatus()>=2)
@@ -191,12 +182,12 @@ public class TSPProbe
 				long				genTimeSeconds=(tokenInfo.getGenTime().getTime())/1000;
 				long				currentTimeSeconds=(long)(start+((end-start)/2))/1000;
 				
-				this.out.put(this.prefix+".tspprobe.clockskew",(genTimeSeconds-currentTimeSeconds)*1000);
+				put("clockskew",(genTimeSeconds-currentTimeSeconds)*1000);
 				
 				if(Math.abs((genTimeSeconds-currentTimeSeconds))>1)
 				{
 					comments.add("clock skew > 1s");
-					result=2;
+					result=STATE.ALERT;
 				}
 				
 				Store responseCertificatesStore=timestampToken.toCMSSignedData().getCertificates();	
@@ -209,45 +200,44 @@ public class TSPProbe
 					{
 						String cleanDn=certificate.getSubject().toString().replace("=", ":");
 						comments.add("signature cert \"" + cleanDn + "\" signed using " + getName(sigalg.getAlgorithm().getId()));
-						result=2;
+						result=STATE.ALERT;
 					}
 				}
 				
 				if(!responseNonce.equals(requestNonce))
 				{
 					comments.add("nonce modified");
-					result=2;
+					result=STATE.ALERT;
 				}
 				
 				if(!Arrays.equals(responseHashedMessage,requestHashedMessage))
 				{
 					comments.add("hashed message modified");
-					result=2;
+					result=STATE.ALERT;
 				}
 				
 				if(table.get(PKCSObjectIdentifiers.id_aa_signingCertificate)==null)
 				{
 					comments.add("signingcertificate missing");
-					result=2;
+					result=STATE.ALERT;
 				}
 			}
 			catch(TSPException tspEx)
 			{
 				comments.add("validation failed");
 				comments.add("tspexception-" + tspEx.getMessage().toLowerCase());
-				result=2;
+				result=STATE.ALERT;
 			}
 			catch(IOException iox)
 			{
 				comments.add("unable to obtain response");
 				comments.add("ioexception-" + iox.getMessage().toLowerCase());
-				result=2;
+				result=STATE.ALERT;
 			}
 			catch(Exception ex)
 			{
 				comments.add("unhandled exception");
-				comments.add("exception-" + ex.getMessage().toLowerCase());
-				result=2;
+				result=STATE.ALERT;
 			}
 			finally
 			{
@@ -255,9 +245,10 @@ public class TSPProbe
 					end=System.currentTimeMillis();
 			}
 
-			this.out.put(this.prefix+".tspprobe.result",result);
-			this.out.put(this.prefix+".tspprobe.responsetime",(end-start));
-			this.out.put(this.prefix+".tspprobe.result.comment",StringUtils.join(comments,"|"));
+			put(RESULT_SUFFIX,result);
+			put(RESULT_COMMENT_SUFFIX,StringUtils.join(comments,"|"));
+			put("responsetime",(end-start));
+			
 			
 			try
 			{
@@ -265,7 +256,7 @@ public class TSPProbe
 			}
 			catch(InterruptedException ex)
 			{
-				this.logger.log("interrupted");
+				log("interrupted");
 			}
 		}
 	}
@@ -286,7 +277,7 @@ public class TSPProbe
 		for(Class<?> clazz: new Class[] {	X9ObjectIdentifiers.class,OIWObjectIdentifiers.class,
 									  		PKCSObjectIdentifiers.class,TeleTrusTObjectIdentifiers.class,
 									  		X509ObjectIdentifiers.class,CMSSignedDataGenerator.class,
-									  		CryptoProObjectIdentifiers.class})
+									  		CryptoProObjectIdentifiers.class	})
 		{
 			for(Field field: clazz.getFields())
 			{
@@ -297,11 +288,9 @@ public class TSPProbe
 						ASN1ObjectIdentifier identifier = (ASN1ObjectIdentifier)field.get(null);
 						String nameFound=field.getName().toLowerCase().replace("_","");
 						oidToName.put(identifier.getId(), nameFound);
-						
 						for(String name: names)
 						{
 							String nameAllowed=name.toLowerCase().replace("_","");
-							
 							if(nameAllowed.equals(nameFound))
 							{
 								oidsAllowed.add(identifier.getId());
@@ -310,11 +299,11 @@ public class TSPProbe
 					}
 					catch (IllegalArgumentException e)
 					{
-						//
+						// if interface changed, simply don't use
 					}
 					catch (IllegalAccessException e)
 					{
-						//
+						// if private, simply don't use
 					}
 					
 				}
@@ -324,7 +313,7 @@ public class TSPProbe
 
 	public static void main(String[] args) throws Exception
 	{
-		new TSPProbe().run();
+		new TSPProbe().probe_forever();
 	}
 }
 

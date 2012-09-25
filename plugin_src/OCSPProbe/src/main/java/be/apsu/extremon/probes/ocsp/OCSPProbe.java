@@ -40,30 +40,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.codec.binary.Base64;
-import be.apsu.extremon.plugin.X3Conf;
-import be.apsu.extremon.plugin.X3Log;
 import be.apsu.extremon.plugin.X3Out;
 
-public class OCSPProbe
+public class OCSPProbe extends X3Out
 {
-	private final X3Conf 		config;
-	private final X3Log  		logger;
-	private final X3Out  		out;
 	private X509Certificate 	certificate;
 	private X509Certificate 	trustAnchorCert;
 	private CertPath			certificatePath;
 	private CertPathValidator 	certificatePathValidator;
 	private PKIXParameters 		pkixParams;
 	private int					delay;
-	private String				prefix;
 	
 	public OCSPProbe()
 	{
 		CertificateFactory certificateFactory=null;
-		
-		this.logger=new X3Log();
-		this.config=new X3Conf();
-		this.out=new X3Out();
 		
 		try
 		{
@@ -71,23 +61,22 @@ public class OCSPProbe
 		}
 		catch(CertificateException cex)
 		{
-			this.logger.log("Don't Have Crypto Libs:" + cex.getMessage());
+			log("Don't Have Crypto Libs:" + cex.getMessage());
 			System.exit(1);
 		}
 		
 		try
 		{
-			certificate=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(this.config.get("certificate"))));
-			trustAnchorCert=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(this.config.get("trustanchor"))));
+			certificate=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(confStr("certificate"))));
+			trustAnchorCert=(X509Certificate)certificateFactory.generateCertificate(new ByteArrayInputStream(Base64.decodeBase64(confStr("trustanchor"))));
 		}
 		catch(CertificateException cex)
 		{
-			this.logger.log("Certificate and Trust Anchor Required:" + cex.getMessage());
+			log("certificate and trustanchor required in config:" + cex.getMessage());
 			System.exit(2);
 		}
 		
-		this.delay=Integer.parseInt(this.config.get("delay"));
-		this.prefix=this.config.get("prefix");
+		this.delay=confInt("delay",DEFAULT_DELAY);
 		
 		try
 		{
@@ -108,64 +97,63 @@ public class OCSPProbe
 			pkixParams.addCertStore(store);
 	
 			Security.setProperty("ocsp.enable","true");
-			Security.setProperty("ocsp.responderURL",this.config.get("url"));
+			Security.setProperty("ocsp.responderURL",confStr("url"));
 			Security.setProperty("ocsp.responderCertSubjectName",this.trustAnchorCert.getSubjectX500Principal().getName());
 	
 			this.certificatePathValidator=CertPathValidator.getInstance("PKIX");
 		}
 		catch(InvalidAlgorithmParameterException iaex)
 		{
-			this.logger.log("Invalid Algorithm Parameter:" + iaex.getMessage());
+			log("Invalid Algorithm Parameter:" + iaex.getMessage());
 			System.exit(3);
 		}
 		catch(CertificateException cex)
 		{
-			this.logger.log("Certificate Exception:" + cex.getMessage());
+			log("Certificate Exception:" + cex.getMessage());
 			System.exit(4);
 		}
 		catch(NoSuchAlgorithmException nsaex)
 		{
-			this.logger.log("No Such Algorithm:" + nsaex.getMessage());
+			log("No Such Algorithm:" + nsaex.getMessage());
 			System.exit(5);
 		}
 		catch(Exception ex)
 		{
-			this.logger.log(ex.getMessage());
+			log(ex.getMessage());
 			System.exit(6);
 		}
 		
-		this.out.start();
-		this.logger.log("Initialized");
+		start();
+		log("Initialized");
 	}
 
-	public void run()
+	public void probe_forever()
 	{
-		int result;
-
-		this.logger.log("Running");
+		log("running");
 		for(;;)
 		{
-			result=0;
-
 			double start=System.currentTimeMillis();
 
 			try
 			{
 				this.certificatePathValidator.validate(this.certificatePath,this.pkixParams);
+				put(RESULT_SUFFIX,STATE.OK);
+				put(RESULT_COMMENT_SUFFIX,"responder validates ok");
 			}
 			catch(CertPathValidatorException ex)
 			{
-				result=1;
+				put(RESULT_SUFFIX,STATE.ALERT);
+				put(RESULT_COMMENT_SUFFIX,"ocsp responder does not validate cert:" + ex.getMessage());
 			}
 			catch(InvalidAlgorithmParameterException ex)
 			{
-				result=2;
+				put(RESULT_SUFFIX,STATE.ALERT);
+				put(RESULT_COMMENT_SUFFIX,"ocsp responder finds invalid algorithm parameter:" + ex.getMessage());
 			}
 
 			double end=System.currentTimeMillis();
 
-			this.out.put(this.prefix + ".ocspprobe.responsetime",(end-start));
-			this.out.put(this.prefix + ".ocspprobe.result",result);
+			put("responsetime",(end-start));
 
 			try
 			{
@@ -173,7 +161,7 @@ public class OCSPProbe
 			}
 			catch(InterruptedException iex)
 			{
-				this.logger.log("Interrupted During Sleep:" + iex.getMessage());
+				log("Interrupted During Sleep:" + iex.getMessage());
 				return;
 			}
 		}	
@@ -181,6 +169,6 @@ public class OCSPProbe
 	
 	public static void main(String[] argv)
 	{
-		new OCSPProbe().run();
+		new OCSPProbe().probe_forever();
 	}
 }

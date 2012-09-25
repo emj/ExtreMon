@@ -22,23 +22,39 @@ package be.apsu.extremon.plugin;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 
 public class Loom implements Runnable
 {
+	protected enum STATE
+	{
+		OK(0),WARNING(1),ALERT(2),MISSING(3),TACKLED(4);
+		
+		private byte code;
+		
+		STATE(int code)
+		{
+			this.code=(byte)code;
+		}
+		
+		byte getCode()
+		{
+			return this.code;
+		}
+	}
+	
 	private final LinkedBlockingQueue<X3Record> outQueue;
 	private final Thread						worker;
 	private final Map<String,String>			shuttle;
 	private final int 							maxShuttleSize;
 	private final int							maxShuttleAge;
 	private final X3Record						requestStop;
+	private  	  String						prefix;
 	private 	  Launcher						launcher;
 	private 	  long							nextDeadline;
 	private		  boolean						ending,lazy;
-	
 	
 	public Loom(int maxShuttleSize,double maxShuttleAge)
 	{
@@ -56,6 +72,16 @@ public class Loom implements Runnable
 		this.reset();
 	}
 	
+	public String getPrefix()
+	{
+		return prefix;
+	}
+
+	public void setPrefix(String prefix)
+	{
+		this.prefix = prefix;
+	}
+
 	public Loom start(Launcher launcher)
 	{
 		if(launcher==null)
@@ -76,38 +102,52 @@ public class Loom implements Runnable
 	{
 		if(label.indexOf('=')!=-1 || label.indexOf('\n')!=-1 || value.indexOf('=')!=-1 || value.indexOf('\n')!=-1)
 			throw new IllegalArgumentException("\"=\" and \"\\n\" Are Illegal in X3Mon Labels And Values");
-		this.outQueue.offer(new X3Record(label,value));
+		this.outQueue.offer(new X3Record(makeLabel(label),value.toLowerCase().replace('=', ':').replace('\n',' ')));
+		return this;
+	}
+	
+	public Loom put(String label, STATE state)
+	{
+		this.outQueue.offer(new X3Record(makeLabel(label),String.valueOf((int)state.getCode())));
 		return this;
 	}
 	
 	public Loom put(String label, long value)
 	{
-		this.outQueue.offer(new X3Record(label,String.valueOf(value)));
+		this.outQueue.offer(new X3Record(makeLabel(label),String.valueOf(value)));
 		return this;
 	}
 	
 	public Loom put(String label, int value)
 	{
-		this.outQueue.offer(new X3Record(label,String.valueOf(value)));
+		this.outQueue.offer(new X3Record(makeLabel(label),String.valueOf(value)));
 		return this;
 	}
 	
 	public Loom put(String label, double value)
 	{
-		this.outQueue.offer(new X3Record(label,String.valueOf(value)));
+		this.outQueue.offer(new X3Record(makeLabel(label),String.valueOf(value)));
 		return this;
 	}
 	
 	public Loom put(String label, float value)
 	{
-		this.outQueue.offer(new X3Record(label,String.valueOf(value)));
+		this.outQueue.offer(new X3Record(makeLabel(label),String.valueOf(value)));
 		return this;
 	}
 	
 	public Loom put(String label, boolean value)
 	{
-		this.outQueue.offer(new X3Record(label,value?"1":"0"));
+		this.outQueue.offer(new X3Record(makeLabel(label),value?"1":"0"));
 		return this;
+	}
+	
+	private String makeLabel(String suffix)
+	{
+		StringBuilder builder=new StringBuilder(this.prefix);
+		builder.append('.');
+		builder.append(suffix);
+		return builder.toString();
 	}
 	
 	private void reset()
@@ -228,59 +268,5 @@ public class Loom implements Runnable
 	public int getQueueLength()
 	{
 		return this.outQueue.size();
-	}
-
-	static int enqueued=0;
-	static int dequeued=0;
-
-	public static void main(String[] args) throws InterruptedException
-	{	
-		Random random=new Random();
-		
-		Loom loom=new Loom(128,.5);
-		
-		loom.start(new Launcher()
-		{
-			@Override
-			public void launch(String shuttle)
-			{
-				int shuttle_size=shuttle.split("\n").length;
-				dequeued+=shuttle_size;
-				try
-				{
-					Thread.sleep(10);
-				}
-				catch(InterruptedException e)
-				{
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-			}
-		});
-		
-		int volg=0;
-		
-		for(int j=0;j<10;j++)
-		{		
-			int count=random.nextInt(1024);
-			System.err.println("enqueue " + count + " records");
-			for(int i=0;i<count;i++)
-			{
-				loom.put("lalalalala." + volg,volg);
-				volg++;
-			}
-			
-			enqueued+=count;
-			Thread.sleep(random.nextInt(10000));
-			System.err.println("en=" + enqueued + " de=" + dequeued + " q=" + loom.getQueueLength());
-		}
-		
-		loom.stop();
-		
-		for(int k=0;k<2;k++)
-		{
-			System.err.println("en=" + enqueued + " de=" + dequeued + " q=" + loom.getQueueLength());
-			Thread.sleep(1000);
-		}
 	}
 }
