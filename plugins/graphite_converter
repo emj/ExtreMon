@@ -1,0 +1,51 @@
+#!/usr/bin/python3
+#
+# ExtreMon Project
+# Copyright (C) 2009-2012 Frank Marien
+# frank@apsu.be
+#  
+# This file is part of ExtreMon.
+#    
+# ExtreMon is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ExtreMon is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import re
+from time import time
+from x3plugin import X3In
+
+class GraphiteFeed(X3In):
+	def __init__(self):
+		X3In.__init__(self)
+		self.allows={}
+		self.passtographite=set()
+		self.ignore=re.compile(self.config['ignore'])
+		self.receive_forever()	
+
+	def receive(self,data):
+		timestamp=int(time())
+		for(label,value) in data:
+			if label.endswith('timestamp'):
+				timestamp=int(value)
+			try:	
+				allow=self.allows[label]
+			except KeyError:
+				allow=(self.ignore.search(label)==None)
+				self.allows[label]=allow
+			if allow:
+				self.passtographite.add((label,value))
+		for (label,value) in self.passtographite:
+			print("%s %s %s" % (label,value,timestamp))
+		self.passtographite.clear()
+
+GraphiteFeed()

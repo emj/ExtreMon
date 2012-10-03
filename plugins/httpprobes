@@ -93,10 +93,7 @@ class ResponseTimeProbe(Thread):
         except KeyError:
           self.put(2,'exp data got resp [%d]' % (response.code))
       except urllib.error.URLError as urlError:
-        if len(urlError.reason)>0:
           self.put(2,'url error %s' % (urlError.reason))
-        else:
-          self.put(2,"urlerror")
       except BaseException as ouch:
         self.put(2,"fix httprobe for [%s]" % (ouch))
       
