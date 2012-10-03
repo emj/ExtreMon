@@ -24,9 +24,9 @@
 from x3plugin import X3IO
 import re
 
-used_thresholds={'edenspace':(40,60),'paredenspace':(40,60),
-                 'survivorspace':(40,60),'parsurvivorspace':(40,60),
-                 'cmsoldgen':(40,60),'cmspermgen':(40,60),
+used_thresholds={'edenspace':(101,101),'paredenspace':(101,101),
+                 'survivorspace':(50,75),'parsurvivorspace':(50,75),
+                 'cmsoldgen':(40,60),'cmspermgen':(50,75),
                  'codecache':(40,60)}
 
 class JAVAMEMSTATE(X3IO):

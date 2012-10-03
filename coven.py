@@ -50,7 +50,11 @@ class Countable(object):
       self.counters[label]=increment
 
 class CauldronToPlugin(Thread,Countable):
-  def __init__(self,name,cauldronAddr,plugin,inFilter,log,outFilter=None):
+  def __init__(self,name,cauldronAddr,plugin,log,
+                inFilter,inValueFilter=None,
+                outFilter=None,outValueFilter=None,
+                loopProtected=False):
+
     Thread.__init__(self,name="%s (in)" % (name))
     Countable.__init__(self)
     self.daemon=True
@@ -60,11 +64,22 @@ class CauldronToPlugin(Thread,Countable):
     self.accu=set()
     self.inFilter=re.compile(inFilter)
     self.log=log
+    self.loopProtected=loopProtected
 
     if outFilter:
       self.outFilter=re.compile(outFilter) 
     else:
       self.outFilter=None
+
+    if inValueFilter:
+      self.inValueFilter=re.compile(inValueFilter)
+    else:
+      self.inValueFilter=None
+
+    if outValueFilter:
+      self.outValueFilter=re.compile(outValueFilter)
+    else:
+      self.outValueFilter=None
   
   def run(self):
     self.running=True
@@ -81,9 +96,23 @@ class CauldronToPlugin(Thread,Countable):
         allow=self.allowCache[label]
       except KeyError:
         self.count('new_labels_per_second',1)
-        allow= (( self.inFilter.search(label)!=None) and
-               (( self.outFilter==None or not
-                ( self.outFilter.search(label)))))
+
+        if self.loopProtected:
+          allowLabel=self.inFilter.search(label)!=None 
+        else:
+          allowLabel=((( self.inFilter.search(label)!=None) and (((self.outFilter==None or not ( self.outFilter.search(label)!=None)))))) 
+
+        if self.inValueFilter==None:
+          allowValueIn=True
+        else:
+          allowValueIn=self.inValueFilter.match(value)!=None
+
+        if self.outValueFilter==None:
+          allowValueOut=True
+        else:
+          allowValueOut=self.outValueFilter.match(value)!=None
+
+        allow=allowLabel and allowValueIn and allowValueOut
         self.allowCache[label]=allow
         if allow:
           self.labels_allowed+=1
@@ -108,7 +137,9 @@ class CauldronToPlugin(Thread,Countable):
 # ------------------------------------------------------------------------
 
 class PluginToCauldron(Thread,Countable):
-  def __init__(self,name,cauldronAddr,plugin,log,outFilter):
+  def __init__(self,name,cauldronAddr,plugin,log,
+               outFilter,outValueFilter=None):
+
     Thread.__init__(self,name="%s (out)" % (name))
     Countable.__init__(self)
     self.daemon=True
@@ -119,6 +150,11 @@ class PluginToCauldron(Thread,Countable):
     self.outFilterExpr=outFilter
     self.outFilter=re.compile(outFilter)
     self.log=log
+
+    if outValueFilter!=None:
+      self.outValueFilter=re.compile(outValueFilter)
+    else:
+      self.outValueFilter=None
 
   def run(self):
     self.running=True
@@ -184,6 +220,11 @@ class Plugin(Thread):
     else:
       self.out_log(self.config.get('out.filter'))
 
+    if self.config.get('loop.protected')!=None:
+      self.loopProtected=(self.config.get('loop.protected')=='yes')
+    else:
+      self.loopProtected=False
+
   def run(self):
     self.log("starting..",priority=syslog.LOG_INFO,component=self.name)
     self.running=True
@@ -204,18 +245,22 @@ class Plugin(Thread):
     ''' if input plugin, connect C2P thread to handle stdin '''    
     if 'in.filter' in self.config:
       self.c2p=CauldronToPlugin(self.name,self.cauldronAddr,
-                               self.process.stdin,
-                               inFilter=self.config.get('in.filter'),
-                               log=self.in_log,
-                               outFilter=self.config.get('out.filter'))
+                     self.process.stdin,
+                     inFilter=self.config.get('in.filter'),
+                     inValueFilter=self.config.get('in.value.filter'),
+                     log=self.in_log,
+                     outFilter=self.config.get('out.filter'),
+                     outValueFilter=self.config.get('out.value.filter'),
+                     loopProtected=self.loopProtected)
       self.c2p.start()
 
     ''' if output plugin, connect P2C thread to handle stdout '''
     if 'out.filter' in self.config:
       self.p2c=PluginToCauldron(self.name,self.cauldronAddr,
-                               self.process.stdout,
-                               log=self.out_log,
-                               outFilter=self.config.get('out.filter'))
+                     self.process.stdout,
+                     log=self.out_log,
+                     outFilter=self.config.get('out.filter'),
+                     outValueFilter=self.config.get('out.value.filter'))
       self.p2c.start()
 
     ''' in this thread, read stderr, and log output '''

@@ -31,6 +31,7 @@ class ResponseTimeState(X3IO):
     X3IO.__init__(self,cache=True,capture=True)
     self.warning_threshold=float(self.config['warning.threshold'])
     self.alert_threshold=float(self.config['alert.threshold'])
+    self.overall_minimum=1000000
     self.receive_forever()
 
   def receive(self,shuttle):
@@ -57,20 +58,28 @@ class ResponseTimeState(X3IO):
           average=None
         if responsetime>self.alert_threshold:
           rresult=2 
-          comments.append('response time alert (>%.0f)' % (self.alert_threshold))
+          comments.append('rt alert (>%.0f)' % (self.alert_threshold))
         elif responsetime>self.warning_threshold: 
           rresult=1
-          comments.append('response time warning (>%.0f)' % (self.warning_threshold))
+          comments.append('rt warning (>%.0f)' % (self.warning_threshold))
         elif average!=None and responsetime>(average*2.0):
+            rresult=1
+            comments.append('rt warning (> 200% of average)')
+        elif average!=None and responsetime<(average/2.0):
+            rresult=1
+            comments.append('rt warning (< 50% of average)')
+        elif responsetime<self.overall_minimum:
           rresult=1
-          comments.append('response time warning (> 200% of average)')
+          comments.append('rt warning (< overall minimum)')
         else:
           rresult=0
-          comments.append('response time ok')
+          comments.append('rt ok')
         self.put('%s.state' % (prefix),max(result,rresult))
-        self.put('%s.state.comment' % (prefix),'|'.join(comments))
+        self.put('%s.state.comment' % (prefix),', '.join(comments))
         del comments[:]
-
+        if responsetime<self.overall_minimum:
+          self.log("adjust overall minimum to %f" % (self.overall_minimum))
+          self.overall_minimum=responsetime
       except KeyError:
         self.log("prefix or measure missing. fix plugin")
         break

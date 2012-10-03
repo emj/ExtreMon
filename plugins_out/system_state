@@ -1,0 +1,68 @@
+#!/usr/bin/python3
+#x3.in.filter=^(?P<prefix>be\.fedict\.eid\.(prod)\.[a-z0-9-]+)\.(.*)\.state$
+#x3.out.filter=^(?P<prefix>be\.fedict\.eid\.(prod)\.[a-z0-9-]+)\.state$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+
+class SystemState(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,cache=False,capture=True)
+    self.systems={}
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    for (label,_value,captures) in shuttle:
+      newState=int(float(_value))
+      prefix=captures['prefix']
+      try:
+        system=self.systems[prefix]
+      except KeyError:
+        self.log('added %s' % (prefix))
+        system=({},{})
+        self.systems[prefix]=system
+      byLabel=system[0]
+      byState=system[1]
+      try:
+        oldState=byLabel[label]
+        byState[oldState].remove(label)
+      except KeyError:
+        pass
+
+      try:
+        newStateLabels=byState[newState]
+      except KeyError:
+        newStateLabels=set()
+        byState[newState]=newStateLabels
+     
+      newStateLabels.add(label) 
+      byLabel[label]=newState
+
+    for sysName,sysData in self.systems.items():
+      (byLabel,byState)=sysData 
+      worstState=0
+      for state,labels in byState.items():
+        if state>worstState:
+          worstState=state
+      self.put('%s.state' % (sysName),worstState)
+
+SystemState()

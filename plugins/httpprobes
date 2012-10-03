@@ -2,7 +2,7 @@
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.httpprobe)\.(result|responsetime|result\.comment)$
 #x3.prefix=be.fedict.eid
 #x3.timeout=10
-#x3.interval=1.0
+#x3.interval=1
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -31,27 +31,14 @@ from queue import Queue
 from x3plugin import X3Out
 #------------------------------------------------------------------------
 
-
-# 
-# Tzury Bar Yochay
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, hdrs, newurl):
-        pass
-
-# thanks to Carles Barrobes
+# NoRedirect Solution (the 3 lines below these comment lines)
+# are by Tzury Bar Yochay
 # http://stackoverflow.com/questions/110498/
 # is-there-an-easy-way-to-request-a-url-in-python-and-not-follow
 # -redirects/110808
-class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-  def http_error_302(self, req, fp, code, msg, headers):
-    infourl = urllib.request.addinfourl(fp, headers, req.get_full_url())
-    infourl.status = code
-    infourl.code = code
-    return infourl
-  http_error_300=http_error_302
-  http_error_301=http_error_302
-  http_error_303=http_error_302
-  http_error_307=http_error_302
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self,req,fp,code,msg,hdrs,newurl):
+        pass
 
 class ResponseTimeProbe(Thread):
   def __init__(self,id,patient,interval,timeout,handler,prefix):
@@ -62,56 +49,66 @@ class ResponseTimeProbe(Thread):
     self.interval=interval
     self.timeout=timeout
     self.handler=handler
-    urllib.request.install_opener(
-                        urllib.request.build_opener(NoRedirect))
+    self.diag=[]
+    self.result=0
+    if 'follow' not in self.config or self.config['follow']=='no':
+      self.opener=urllib.request.build_opener(NoRedirect).open
+    else:
+      self.opener=urllib.request.urlopen
+
+  def put(self,result,text):
+    if result>self.result:
+      self.result=result
+    if text!=None and len(text)>0:
+      self.diag.append(text)
+
+  def clear(self):
+    self.result=0
+    del self.diag[:]
 
   def run(self):
+    self.clear()
     self.running=True
-    diag=[]
-    result=0
     while self.running:
       start=time.time()
       try:
-        socket=urllib.request.urlopen(self.config['url'], timeout=self.timeout)
-        diag.append('connection ok')
+        socket=self.opener(self.config['url'], timeout=self.timeout)
+        self.put(0,'connection ok')
         data=socket.read()
-        if len(data)>0:
-            diag.append('read %d bytes' % (len(data)))
+        if data!=None and len(data)>0:
+            self.put(0,'read %d' % (len(data)))
+            if 'expect_text' in self.config:
+              if str(data,'utf-8').find(self.config['expect_text'])==-1:
+                self.put(2,'exp text [%s] missing' % (self.config['expect_text']))
+              else:
+                self.put(0,'exp text ok')
         else:
-            diag.append('no data')
-            result=2
-        try:
-            if data.find(self.config['expect_text'])==-1:
-              diag.append('expected text [%s] not found' % (self.config['expect_text']))
-              result=2
-            else:
-              diag.append('expected text ok')
-        except KeyError:
-            pass
+            self.put(2,'no data')
       except urllib.error.HTTPError as response:
         try:
             if response.code!=self.config['expect_code']:
-              diag.append('expected response [%d] but got [%d]' % (self.config['expect_code'],response.code))
-              result=2
+              self.put(2,'exp resp [%d] got [%d]' % (self.config['expect_code'],response.code))
             else:
-              diag.append('response code ok');
+              self.put(0,'resp [%d] ok' % (response.code));
         except KeyError:
-            pass
+          self.put(2,'exp data got resp [%d]' % (response.code))
       except urllib.error.URLError as urlError:
         if len(urlError.reason)>0:
-          diag.append('url error %s' % (urlError.reason))
+          self.put(2,'url error %s' % (urlError.reason))
         else:
-          diag.append("urlerror")
-        result=2
-      except:
-        diag.append('general error')
-        result=2
+          self.put(2,"urlerror")
+      except BaseException as ouch:
+        self.put(2,"fix httprobe for [%s]" % (ouch))
       
       self.handler.put("%s.%s.httpprobe.responsetime" % (self.handler.prefix, self.id), (time.time()-start)*1000.0)
-      self.handler.put("%s.%s.httpprobe.result" % (self.handler.prefix, self.id),result)
-      self.handler.put('%s.%s.httpprobe.result.comment' % (self.handler.prefix,self.id), '|'.join(diag))
+      self.handler.put("%s.%s.httpprobe.result" % (self.handler.prefix, self.id),self.result)
 
-      del diag[:]                               
+      if len(self.diag)>0:
+        self.handler.put('%s.%s.httpprobe.result.comment' % (self.handler.prefix,self.id), ', '.join(self.diag))
+      else:
+        self.handler.log(self.config['url'])
+
+      self.clear()
       time.sleep(self.interval)
 
   def stop(self):

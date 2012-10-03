@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+#x3.in.filter=state$
+#x3.out.filter=state$
+#x3.loop.protected=yes
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from time import time,sleep
+from x3plugin import X3IO
+
+class Missing(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self)
+    self.records={}
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    now=time()
+    for (label,_value) in shuttle:
+      value=int(float(_value))
+      if value<=2:
+        try:
+          (last,count,avg)=self.records[label]
+          ago=now-last
+          if (avg>0 and ago>(10*avg)) or ago>30:
+            self.log(label)
+            self.put(label,'3')
+          avg+=((ago-avg)/(count+1))
+          dev=ago-avg
+          count+=1
+          self.records[label]=(now,count,avg)
+        except KeyError:
+          self.records[label]=(now,0,0)
+
+Missing()
