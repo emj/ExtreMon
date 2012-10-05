@@ -1,0 +1,89 @@
+#!/usr/bin/python3
+#x3.whisper.dir=/data/graphite/storage/whisper/be/
+#x3.whisper.extension=wsp
+#x3.out.filter=^nada$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import os,time
+import pyinotify
+from x3plugin import X3Out
+
+class CarbonFix(pyinotify.ProcessEvent,X3Out):
+    def __init__(self):
+      X3Out.__init__(self)
+      self.path=self.config['whisper.dir']
+      self.extension='.%s' % (self.config['whisper.extension'])
+      self.log('fixing existing branches in [%s]' % (self.path))
+      self.fix_existing()
+      self.wm=pyinotify.WatchManager()
+      self.notifier=pyinotify.Notifier(self.wm,self)
+      self.log('acquiring recursive watch on [%s]' % (self.path))
+      self.watch=self.wm.add_watch(   self.path,
+                                      pyinotify.IN_CREATE,
+                                      rec=True,auto_add=True)
+      self.log('watching for new branches to fix..')
+      while True:
+        try:
+          self.notifier.process_events()
+          if self.notifier.check_events():
+            self.notifier.read_events()
+        except KeyboardInterrupt:
+          self.notifier.stop()
+
+# ------- called by Notifier -------------------------------
+
+    def process_IN_CREATE(self,event):
+      self.fix_carbon_node(event.path)
+
+# ------------------------------------------------------------
+
+    def fix_existing(self):
+      for (root,kids,files) in os.walk(self.path):
+        self.fix_carbon_node(root)
+    
+    def symlink(self,source,link_name):
+      try:
+        os.symlink(source,link_name)
+        self.log("value at branch [%s] linked" % (link_name))
+      except OSError:
+        pass
+
+    def fix_carbon_node(self,node):
+      (parent,_name)=os.path.split(node)
+      (name,ext)=os.path.splitext(_name)
+      if os.path.isdir(node) and ext=='':
+        wsp_name=name+self.extension
+        wsp_path=os.path.join(parent,wsp_name)
+        if os.path.isfile(wsp_path):
+          rel_wsp_path=os.path.join(os.pardir,wsp_name)
+          link_name=os.path.join(node,wsp_name)
+          self.symlink(rel_wsp_path,link_name)
+      elif os.path.isfile(node) and ext==self.extension:
+        dir_name=name
+        dir_path=os.path.join(parent,name)
+        if os.path.isdir(dir_path):
+          rel_wsp_path=os.path.join(os.pardir,_name)
+          link_name=os.path.join(parent,name,_name)
+          self.symlink(rel_wsp_path,link_name)
+
+CarbonFix()
+

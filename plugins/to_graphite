@@ -1,4 +1,8 @@
 #!/usr/bin/python3
+#x3.in.filter=^be\.(fedict|apsu|colifra)
+#x3.ignore=(sequence|comment)$
+#x3.in.value.filter=^[0-9.]+$
+
 #
 # ExtreMon Project
 # Copyright (C) 2009-2012 Frank Marien
@@ -20,19 +24,48 @@
 # along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-import re
+import re,socket,sys
 from time import time
+from pickle import dumps
+import socket,struct
 from x3plugin import X3In
 
+# [(path, (timestamp, value)), ...]
+
 class GraphiteFeed(X3In):
-	def __init__(self):
+	def __init__(self,carbon_addr=('localhost',2004)):
 		X3In.__init__(self)
 		self.allows={}
-		self.passtographite=set()
+		self.passtographite=[]
 		self.ignore=re.compile(self.config['ignore'])
+		self.carbon_addr=carbon_addr
+		self.carbon=None
 		self.receive_forever()	
 
+	def ensure_connection(self):
+		if self.carbon!=None:
+			return True
+		for (af,socktype,proto,canonname,sa) in socket.getaddrinfo(self.carbon_addr[0],self.carbon_addr[1], socket.AF_UNSPEC, socket.SOCK_STREAM):
+			try:
+				self.carbon=socket.socket(af,socktype,proto)
+				self.log("created socket")
+			except socket.error as msg:
+				self.carbon=None
+				continue
+			try:
+				self.carbon.connect(sa)
+				self.log("connected")
+				return True
+			except socket.error as msg:
+				self.carbon.close()
+				self.carbon=None
+				continue
+		return False
+
 	def receive(self,data):
+		if not self.ensure_connection():
+			self.log("connection failed")
+			return
 		timestamp=int(time())
 		for(label,value) in data:
 			if label.endswith('timestamp'):
@@ -43,9 +76,12 @@ class GraphiteFeed(X3In):
 				allow=(self.ignore.search(label)==None)
 				self.allows[label]=allow
 			if allow:
-				self.passtographite.add((label,value))
-		for (label,value) in self.passtographite:
-			print("%s %s %s" % (label,value,timestamp))
-		self.passtographite.clear()
+				self.passtographite.append((label,(timestamp,float(value))))
+		if len(self.passtographite)>0:
+			payload=dumps(self.passtographite,protocol=2)
+			header=struct.pack("!L", len(payload))
+			message=header+payload
+			self.carbon.sendall(message)
+		del self.passtographite[:]
 
 GraphiteFeed()
