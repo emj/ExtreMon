@@ -27,6 +27,21 @@ import os,time
 import pyinotify
 from x3plugin import X3Out
 
+# 
+# ExtreMon data sometimes has a hierarchy where a branch also has a value.
+# ..responsetime=123, ..responsetime.status=0, ...responsetime.status.comment=Fast Enough
+# This happens when some value was derived from another: it captures that relationship.
+# While a whisper db storage hierarchy can work on this data, bu default, a Graphite Dashboard using that
+# data will not see values which have derived ones. e.g. it expects
+# values to occur only at leaves, not branches.
+#
+# Fortunately, Christophe De Tiege discovered that a simply symlink can cause
+# the Graphite Dashboard to find the data anyway. This plugin takes a whisper directory
+# and makes sure that any directory (branch) that also contains a wsp file by the
+# same basename (=data values) has a symlink to that data file, causing the branch's
+# data to appear a a child node. Thanks CDT!
+#
+
 class CarbonFix(pyinotify.ProcessEvent,X3Out):
     def __init__(self):
       X3Out.__init__(self)
