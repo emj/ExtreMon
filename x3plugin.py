@@ -86,12 +86,15 @@ class X3In(X3Log,X3Conf):
     raise TypeError("X3 Plugins Should Implement the "
                     "receive(self,shuttle) method")
 
-class X3Out(Loom,X3Log,X3Conf):
+class X3Out(X3Log,X3Conf):
   def __init__(self,max_shuttle_size=128,max_shuttle_age=.5):
     X3Log.__init__(self)
     X3Conf.__init__(self)
-    Loom.__init__(self,launcher=self.launch,max_shuttle_size=max_shuttle_size, max_shuttle_age=max_shuttle_age)
-    self.start()
+    self.loom=Loom(launcher=self.launch,max_shuttle_size=max_shuttle_size, max_shuttle_age=max_shuttle_age)
+    self.loom.start()
+
+  def put(self,label,value):
+    self.loom.put(label,value)
 
   def launch(self,shuttle):
     try:

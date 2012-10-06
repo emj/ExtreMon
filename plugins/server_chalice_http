@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 #x3.listen.addr=localhost
 #x3.listen.port=17817
-#x3.prefix=be.apsu.eridu
+#x3.prefix=be.fedict.eid.mon.isolde
 #x3.in.filter=^be\.(fedict|apsu|colifra)
+#x3.out.filter=consumers\.(count|identities)$
+#x3.loop.protected=yes
 
 #
 # ExtreMon Project
@@ -32,7 +34,7 @@ from queue        import  Queue,Full
 from socket       import  error
 from extremon     import  CauldronReceiver,ChaliceServer
 from threading    import  Thread
-from x3plugin     import  X3In
+from x3plugin     import  X3IO
 
 
 class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
@@ -65,9 +67,25 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
           if select:
             self.shuttle.add('%s=%s' % (label,value))
 
+  def get_client_id_from_beid(self,headers):
+    idParts=[]
+    firstNamesStr=headers.get('X-FirstNames')
+    if firstNamesStr!=None:
+      firstNames=firstNamesStr.split(' ')
+      idParts.append(firstNames[0])
+    lastName=headers.get('X-LastName')
+    if lastName!=None:
+      idParts.append(lastName)
+    return ' '.join(idParts)
+
   def do_GET(self):
     self.shuttle=set()
     self.select_cache={}
+    self.client_ip=self.headers.get('X-Forwarded-For')
+    if self.headers.get('X-BeID-Authenticated')!=None:
+      self.client_id=self.get_client_id_from_beid(self.headers) 
+    else:
+      self.client_id=self.client_ip
     if self.path and self.valid_selector(self.path):
       try:
         regex=self.regexify(self.path)
@@ -87,6 +105,7 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
       self.end_headers()
       self.running=True
       self.outq=Queue(maxsize=1000)
+      self.server.log('%s subscribed to [%s] from [%s]' % (self.client_id,self.path,self.client_ip))
       self.server.add_consumer(self)
       while self.running:
         try:
@@ -101,6 +120,7 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
           self.running=False
     finally:
       self.server.remove_consumer(self)
+      self.server.log('%s [%s] unsubscribed' % (self.client_id,self.client_ip))
 
   def write(self,data):
     try:
@@ -109,19 +129,25 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
       pass
       
 class HTTPSelectiveChaliceServer(ThreadingMixIn,ChaliceServer,HTTPServer):
-  def __init__(self,listen,prefix):
+  def __init__(self,listen,prefix,dispatcher):
+    self.dispatcher=dispatcher
     HTTPServer.__init__(self,listen,HTTPSelectiveChaliceRequestHandler)
     ChaliceServer.__init__(self,prefix)
+    self.log("chalice server started")
 
-class HTTPSelectiveChaliceDispatcher(X3In,Thread):
+  def log(self,message):
+    self.dispatcher.log(message)
+
+class HTTPSelectiveChaliceDispatcher(X3IO,Thread):
   def __init__(self):
     Thread.__init__(self,name='HTTPSelectiveChaliceDispatcher')
     self.daemon=True
-    X3In.__init__(self)
+    X3IO.__init__(self)
     listen_addr=self.config['listen.addr']
     listen_port=int(self.config['listen.port'])
-    prefix=self.config['prefix']
-    self.server=HTTPSelectiveChaliceServer((listen_addr,listen_port),prefix)
+    self.prefix=self.config['prefix']
+    self.server=HTTPSelectiveChaliceServer((listen_addr,listen_port),self.prefix,self)
+    self.log("starting")
     self.server.start()
     self.start()
     self.server.serve_forever()
@@ -131,5 +157,9 @@ class HTTPSelectiveChaliceDispatcher(X3In,Thread):
 
   def receive(self,data):
     self.server.write(data)
+    consumers=self.server.get_consumers()
+    self.put('%s.consumers.count' % (self.prefix),len(consumers))
+    if len(consumers)>0:
+      self.put('%s.consumers.identities' % (self.prefix),' | '.join(sorted([cons.client_id for cons in consumers])))
 
 HTTPSelectiveChaliceDispatcher()

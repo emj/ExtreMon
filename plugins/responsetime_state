@@ -65,9 +65,6 @@ class ResponseTimeState(X3IO):
         elif average!=None and responsetime>(average*2.0):
             rresult=1
             comments.append('rt warning (> 200% of average)')
-        elif average!=None and responsetime<(average/2.0):
-            rresult=1
-            comments.append('rt warning (< 50% of average)')
         elif responsetime<self.overall_minimum:
           rresult=1
           comments.append('rt warning (< overall minimum)')

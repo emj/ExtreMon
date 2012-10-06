@@ -305,6 +305,10 @@ class CauldronServer(Thread):
     with self.consumers_lock:
       self.consumers.remove(consumer)
 
+  def get_consumers(self):
+    with self.consumers_lock:
+      return set(self.consumers)
+
   def write(self,data):
     if len(data)>0:
       self.inq.put(data)  
