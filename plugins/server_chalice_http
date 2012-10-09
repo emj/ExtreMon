@@ -28,6 +28,7 @@
 #
 
 import            sys, re, sre_constants
+from urllib.parse import  unquote
 from http.server  import  HTTPServer,BaseHTTPRequestHandler
 from socketserver import  ThreadingMixIn
 from queue        import  Queue,Full
@@ -41,10 +42,10 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
   server_version = "Extremon/0.2"
 
   def valid_selector(self,path):
-    return re.match('^[a-z0-9_:;/*-]*$',path)
+    return re.match('^[a-z0-9_:;/.*(|)$?-]*$',path)
 
   def regexify(self,path):
-    pathelems=self.path[1:].split('/')
+    pathelems=path[1:].split('/')
     if len(pathelems)==0:
       return '.*'
     for i in range(0,len(pathelems)):
@@ -76,7 +77,7 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
     lastName=headers.get('X-LastName')
     if lastName!=None:
       idParts.append(lastName)
-    return ' '.join(idParts)
+    return ' '.join(idParts).encode('raw_unicode_escape').decode('utf-8')
 
   def do_GET(self):
     self.shuttle=set()
@@ -86,15 +87,18 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
       self.client_id=self.get_client_id_from_beid(self.headers) 
     else:
       self.client_id=self.client_ip
-    if self.path and self.valid_selector(self.path):
+    path=unquote(self.path)
+    if path and self.valid_selector(path):
       try:
-        regex=self.regexify(self.path)
+        regex=self.regexify(path)
         if regex:
           self.regex=re.compile(regex)
+          self.server.log(regex)
       except sre_constants.error:
         self.send_error(400,'Invalid Selector')
         return
     else:
+      self.server.log(path)
       self.send_error(400,'Invalid Character In Request')
       return
 
@@ -105,7 +109,7 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
       self.end_headers()
       self.running=True
       self.outq=Queue(maxsize=1000)
-      self.server.log('%s subscribed to [%s] from [%s]' % (self.client_id,self.path,self.client_ip))
+      self.server.log('%s subscribed to [%s] from [%s]' % (self.client_id,path,self.client_ip))
       self.server.add_consumer(self)
       while self.running:
         try:
