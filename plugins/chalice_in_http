@@ -1,0 +1,76 @@
+#!/usr/bin/python3
+#x3.listen.addr=localhost
+#x3.listen.port=17617
+#x3.prefix=be.fedict.eid.mon.isolde
+#x3.out.filter=^be\.(fedict|apsu|colifra)
+
+#
+# ExtreMon Project
+# Copyright (C) 2009-2012 Frank Marien
+# frank@apsu.be
+#  
+# This file is part of ExtreMon.
+#    
+# ExtreMon is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ExtreMon is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import            sys, re, sre_constants
+from urllib.parse import  unquote
+from http.server  import  HTTPServer,BaseHTTPRequestHandler
+from socketserver import  ThreadingMixIn
+from socket       import  error
+from time         import  sleep
+from x3plugin     import  X3Out
+
+
+class HTTPChalicePostHandler(BaseHTTPRequestHandler):
+  server_version = "Extremon/0.2"
+
+  def do_POST(self):
+    self.server.log('POST')
+    accu=set()
+    try:
+      self.running=True
+      while self.running:
+        for linebytes in self.rfile:
+          self.server.log('line')
+          try:
+            (label,value)=str(linebytes,'utf-8').split('=') 
+            self.server.log('label=%s value=%s' % (label,value))
+          except ValueError:
+            self.server.log("Can't Parse [%s]" % (linebytes))
+    finally:
+      self.server.log('closed')
+
+class HTTPChalicePostServer(ThreadingMixIn,HTTPServer):
+  def __init__(self,listen,prefix,dispatcher):
+    self.dispatcher=dispatcher
+    HTTPServer.__init__(self,listen,HTTPChalicePostHandler)
+    self.log("chalice post server started")
+  def log(self,message):
+    self.dispatcher.log(message)
+
+class HTTPChalicePostDispatcher(X3Out):
+  def __init__(self):
+    X3Out.__init__(self)
+    listen_addr=self.config['listen.addr']
+    listen_port=int(self.config['listen.port'])
+    self.prefix=self.config['prefix']
+    self.server=HTTPChalicePostServer((listen_addr,listen_port),self.prefix,self)
+    self.log("starting")
+    self.server.serve_forever()
+    while True:
+      sleep(1)
+
+HTTPChalicePostDispatcher()
