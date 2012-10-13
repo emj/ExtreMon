@@ -38,20 +38,30 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
   server_version = "Extremon/0.2"
 
   def do_POST(self):
-    self.server.log('POST')
-    accu=set()
-    try:
-      self.running=True
-      while self.running:
-        for linebytes in self.rfile:
-          self.server.log('line')
-          try:
-            (label,value)=str(linebytes,'utf-8').split('=') 
-            self.server.log('label=%s value=%s' % (label,value))
-          except ValueError:
-            self.server.log("Can't Parse [%s]" % (linebytes))
-    finally:
-      self.server.log('closed')
+    self.server.log('POST') 
+    clen=self.headers.get('content-length')
+    if clen:
+      clen=int(clen)
+      self.server.log('%d bytes' % (clen))
+    else:
+      self.server.log('POST ERROR: missing content-length')
+      return
+    shuttleBytes=self.rfile.read(clen)
+    if shuttleBytes!=None and len(shuttleBytes)>4:
+      shuttle=str(shuttleBytes,'utf-8')
+      records={}
+      for line in shuttle.splitlines():
+        try:
+          (label,value)=line.split('=')
+          records[label]=value
+        except ValueError:
+          self.server.log("Can't Parse [%s]" % (line))
+      self.server.log(records)
+    self.send_response(200,'OK')
+    self.send_header("Content-type", "text/plain")
+    self.send_header("Connection", "Keep-Alive")
+    self.send_header("Content-Length",0)
+    self.end_headers()
 
 class HTTPChalicePostServer(ThreadingMixIn,HTTPServer):
   def __init__(self,listen,prefix,dispatcher):
