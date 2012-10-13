@@ -1,0 +1,96 @@
+#!/usr/bin/python3
+#x3.listen.addr=localhost
+#x3.listen.port=17717
+#x3.prefix=be.fedict.eid.mon.isolde
+#x3.out.filter=^nada$
+
+#
+# ExtreMon Project
+# Copyright (C) 2009-2012 Frank Marien
+# frank@apsu.be
+#  
+# This file is part of ExtreMon.
+#    
+# ExtreMon is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ExtreMon is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+import sys
+from time         import  sleep
+from urllib.parse import  unquote,urlparse,parse_qs
+from http.server  import  HTTPServer,BaseHTTPRequestHandler
+from socketserver import  ThreadingMixIn
+from socket       import  error
+from threading    import  Thread
+from x3plugin     import  X3Out
+
+jnlp_template='''<?xml version="1.0" encoding="utf-8"?>
+<jnlp
+    spec="1.0+"
+    codebase="https://__HOST__/console"
+    href="x3console.jnlp">
+  <information>
+    <title>FedICT eID X3Mon</title>
+    <vendor>eID Team</vendor>
+    <description>ExtreMon Console for eID Services</description>
+  </information>
+  <application-desc main-class="be.apsu.extremon.console.X3Console">
+    <argument>https://__HOST__/console/be_fedict_eid.svg</argument>
+    <argument>https://__HOST__/chalice/__USER__</argument>
+  </application>
+  <security>
+     <all-permissions/>
+  </security>
+  <resources>
+    <j2se version="1.7+"/>
+    <jar href="x3console.jar" main="true"/>
+  </resources>
+  <application-desc main-class="be.apsu.extremon.console.X3Console"/>
+</jnlp>
+'''
+
+class HTTPConsoleJNLPHandler(BaseHTTPRequestHandler):
+  server_version = "Extremon/0.2"
+
+  def do_GET(self):
+    self.send_response(200)
+    self.send_header("Content-type", "application/x-java-jnlp-file")
+    self.end_headers()
+
+    try:
+      query=parse_qs(urlparse(self.path).query)
+      user=query['user'][0]
+    except KeyError:
+      user='eid'
+    self.server.log(user)
+
+    try:
+      host=self.headers.get('X-Forwarded-Server')
+      jnlp=jnlp_template.replace('__HOST__',host)
+      jnlp=jnlp.replace('__USER__',user)
+      self.wfile.write(bytes(jnlp,'utf-8'))
+      self.server.log(self.headers.get('X-Forwarded-Server'))
+    except:
+      self.server.log(sys.exc_info()[1])
+
+class HTTPConsoleJNLPServer(ThreadingMixIn,HTTPServer,X3Out):
+  def __init__(self):
+    X3Out.__init__(self)
+    listen_addr=self.config['listen.addr']
+    listen_port=int(self.config['listen.port'])
+    self.prefix=self.config['prefix']
+    HTTPServer.__init__(self,(listen_addr,listen_port),HTTPConsoleJNLPHandler)
+    self.log("starting")
+    self.serve_forever()
+
+HTTPConsoleJNLPServer()

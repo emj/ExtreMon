@@ -87,7 +87,7 @@ class X3In(X3Log,X3Conf):
                     "receive(self,shuttle) method")
 
 class X3Out(X3Log,X3Conf):
-  def __init__(self,max_shuttle_size=128,max_shuttle_age=.5):
+  def __init__(self,max_shuttle_size=512,max_shuttle_age=.5):
     X3Log.__init__(self)
     X3Conf.__init__(self)
     self.loom=Loom(launcher=self.launch,max_shuttle_size=max_shuttle_size, max_shuttle_age=max_shuttle_age)
