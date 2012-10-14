@@ -1,8 +1,7 @@
 #!/usr/bin/python3
 #x3.listen.addr=localhost
 #x3.listen.port=17617
-#x3.prefix=be.fedict.eid.mon.isolde
-#x3.out.filter=^be\.(fedict|apsu|colifra)
+#x3.out.filter=\.(responding|(responder(\.comment)?))$
 
 #
 # ExtreMon Project
@@ -37,50 +36,49 @@ from x3plugin     import  X3Out
 class HTTPChalicePostHandler(BaseHTTPRequestHandler):
   server_version = "Extremon/0.2"
 
+  def body_response(self,text):
+    textBytes=bytes('%s\n' % (text,),'utf-8')
+    self.send_header("Content-type", "text/plain")
+    self.send_header("Content-Length",len(textBytes))
+    self.end_headers()                                                  
+    self.wfile.write(textBytes)
+    self.wfile.flush()
+
+  def log_message(format,*args):
+    pass
+
   def do_POST(self):
-    self.server.log('POST') 
     clen=self.headers.get('content-length')
     if clen:
       clen=int(clen)
-      self.server.log('%d bytes' % (clen))
     else:
       self.server.log('POST ERROR: missing content-length')
       return
     shuttleBytes=self.rfile.read(clen)
     if shuttleBytes!=None and len(shuttleBytes)>4:
+      recordsPosted=0
       shuttle=str(shuttleBytes,'utf-8')
-      records={}
       for line in shuttle.splitlines():
-        try:
-          (label,value)=line.split('=')
-          records[label]=value
-        except ValueError:
-          self.server.log("Can't Parse [%s]" % (line))
-      self.server.log(records)
-    self.send_response(200,'OK')
-    self.send_header("Content-type", "text/plain")
-    self.send_header("Connection", "Keep-Alive")
-    self.send_header("Content-Length",0)
-    self.end_headers()
+        if len(line)>0:
+          try:
+            (label,value)=line.split('=')
+            self.server.put(label,value)
+            recordsPosted+=1
+          except ValueError:
+            self.server.log("Can't Parse [%s]" % (line))
+      self.send_response(202,'Accepted')
+      self.body_response('%d Records Enqueued' % (recordsPosted,))
+    else:
+      self.send_response(400,'Bad Request')
+      self.body_response('Not A Valid Shuttle')
+      
 
-class HTTPChalicePostServer(ThreadingMixIn,HTTPServer):
-  def __init__(self,listen,prefix,dispatcher):
-    self.dispatcher=dispatcher
-    HTTPServer.__init__(self,listen,HTTPChalicePostHandler)
-    self.log("chalice post server started")
-  def log(self,message):
-    self.dispatcher.log(message)
-
-class HTTPChalicePostDispatcher(X3Out):
+class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out):
   def __init__(self):
     X3Out.__init__(self)
-    listen_addr=self.config['listen.addr']
-    listen_port=int(self.config['listen.port'])
-    self.prefix=self.config['prefix']
-    self.server=HTTPChalicePostServer((listen_addr,listen_port),self.prefix,self)
+    listen=(self.config['listen.addr'],int(self.config['listen.port']))
+    HTTPServer.__init__(self,listen,HTTPChalicePostHandler)
     self.log("starting")
-    self.server.serve_forever()
-    while True:
-      sleep(1)
+    self.serve_forever()
 
-HTTPChalicePostDispatcher()
+HTTPChalicePostServer()
