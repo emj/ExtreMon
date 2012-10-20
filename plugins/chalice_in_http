@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 #x3.listen.addr=localhost
 #x3.listen.port=17617
-#x3.out.filter=\.(responding|(responder(\.comment)?))$
+#x3.prefix=be.fedict.eid.mon.operators
+#x3.out.filter=^be\.fedict\.eid\.
 
 #
 # ExtreMon Project
@@ -45,8 +46,8 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
     self.wfile.write(textBytes)
     self.wfile.flush()
 
-  def log_message(format,*args):
-    pass
+#  def log_message(format,*args):
+#    pass
 
   def get_client_id_from_beid(self,headers):
     idParts=[]
@@ -64,6 +65,7 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
     self.client_id=self.get_client_id_from_beid(self.headers)
     if len(self.client_id)<1:
       self.client_id=self.client_ip
+    self.client_id_label=self.client_id.lower().replace(' ','_')
     clen=self.headers.get('content-length')
     if clen:
       clen=int(clen)
@@ -78,16 +80,21 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
         if len(line)>0:
           try:
             (_label,value)=line.split('=')
-            _labelparts=_label.split('.')
-            if _label.endswith('.responding'):
-              label='.'.join(_labelparts[:-1])
-              if value=='1':
-                self.server.set_responding(label,user=self.client_id)
-              else:
-                self.server.unset_responding(label)
-            elif _label.endswith('.responder.comment'):
-              label='.'.join(_labelparts)[:-2]
-              self.server.set_responding(label,user=self.client_id,comment=value)
+            self.server.log(_label)
+            if _label=='user.photo':
+              self.server.put('%s.%s.name' % (self.server.prefix,self.client_id_label,),self.client_id)
+              self.server.put('%s.%s.photo' % (self.server.prefix,self.client_id_label,),value)
+            else:
+              _labelparts=_label.split('.')
+              if _label.endswith('.responding'):
+                label='.'.join(_labelparts[:-1])
+                if value=='1':
+                  self.server.set_responding(label,user=self.client_id)
+                else:
+                  self.server.unset_responding(label)
+              elif _label.endswith('.responder.comment'):
+                label='.'.join(_labelparts[:-2])
+                self.server.set_responding(label,user=self.client_id,comment=value)
             recordsPosted+=1
           except ValueError:
             self.server.log("Can't Parse [%s]" % (line))
@@ -105,6 +112,7 @@ class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out,Thread):
     self.daemon=True
     self.responding={}
     self.responding_lock=Lock()
+    self.prefix=self.config['prefix']
     listen=(self.config['listen.addr'],int(self.config['listen.port']))
     HTTPServer.__init__(self,listen,HTTPChalicePostHandler)
     self.log("starting")
@@ -118,10 +126,10 @@ class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out,Thread):
         for (label,resp_rec) in self.responding.items():
           self.put('%s.responding' % (label,),1)
           for (name,data) in resp_rec.items():
-            self.put('%s.%s' % (label,name,),data)
+            self.put('%s.responder.%s' % (label,name,),data)
       sleep(1)
 
-  def set_responding(self,label,user=None,comment=None):
+  def set_responding(self,label,user=None,comment=None,photo=None):
     self.log('set %s RESPONDING on %s with comment %s' % (user,label,comment,))
     with self.responding_lock:
       try:
@@ -130,15 +138,18 @@ class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out,Thread):
         resp_rec={}
         self.responding[label]=resp_rec
       if user!=None:
-        resp_rec['responder']=user
+        resp_rec['name']=user
       if comment!=None:
         resp_rec['comment']=comment
   
   def unset_responding(self,label):
     self.log('unset RESPONDING on %s' % (label,))
     with self.responding_lock:
-      del self.responding[label]
       self.put('%s.responding' % (label,),0)
+      try:
+        del self.responding[label]
+      except KeyError:
+        self.log('state out of sync for [%s]' % (label))
     
 
 HTTPChalicePostServer()
