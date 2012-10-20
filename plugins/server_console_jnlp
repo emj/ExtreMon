@@ -45,8 +45,9 @@ jnlp_template='''<?xml version="1.0" encoding="utf-8"?>
     <description>ExtreMon Console for eID Services</description>
   </information>
   <application-desc main-class="be.apsu.extremon.console.X3Console">
-    <argument>https://__HOST__/console/be_fedict_eid.svg</argument>
-    <argument>https://__HOST__/chalice/__USER__</argument>
+    <argument>https://__HOST__/console/x3console.svg</argument>
+    <argument>https://__HOST__/console/chalice/</argument>
+    <argument>https://__HOST__/console/libation/</argument>
   </application>
   <security>
      <all-permissions/>
@@ -77,7 +78,6 @@ class HTTPConsoleJNLPHandler(BaseHTTPRequestHandler):
     try:
       host=self.headers.get('X-Forwarded-Server')
       jnlp=jnlp_template.replace('__HOST__',host)
-      jnlp=jnlp.replace('__USER__',user)
       self.wfile.write(bytes(jnlp,'utf-8'))
       self.server.log(self.headers.get('X-Forwarded-Server'))
     except:

@@ -83,9 +83,8 @@ class HTTPSelectiveChaliceRequestHandler(BaseHTTPRequestHandler):
     self.shuttle=set()
     self.select_cache={}
     self.client_ip=self.headers.get('X-Forwarded-For')
-    if self.headers.get('X-BeID-Authenticated')!=None:
-      self.client_id=self.get_client_id_from_beid(self.headers) 
-    else:
+    self.client_id=self.get_client_id_from_beid(self.headers) 
+    if len(self.client_id)<1:
       self.client_id=self.client_ip
     path=unquote(self.path)
     if path and self.valid_selector(path):

@@ -102,8 +102,6 @@ class ResponseTimeProbe(Thread):
 
       if len(self.diag)>0:
         self.handler.put('%s.%s.httpprobe.result.comment' % (self.handler.prefix,self.id), ', '.join(self.diag))
-      else:
-        self.handler.log(self.config['url'])
 
       self.clear()
       time.sleep(self.interval)

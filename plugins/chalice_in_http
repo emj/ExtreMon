@@ -31,6 +31,7 @@ from socketserver import  ThreadingMixIn
 from socket       import  error
 from time         import  sleep
 from x3plugin     import  X3Out
+from threading    import  Thread,Lock
 
 
 class HTTPChalicePostHandler(BaseHTTPRequestHandler):
@@ -47,7 +48,22 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
   def log_message(format,*args):
     pass
 
+  def get_client_id_from_beid(self,headers):
+    idParts=[]
+    firstNamesStr=headers.get('X-FirstNames')
+    if firstNamesStr!=None:
+      firstNames=firstNamesStr.split(' ')
+      idParts.append(firstNames[0])
+    lastName=headers.get('X-LastName')
+    if lastName!=None:
+      idParts.append(lastName)
+    return ' '.join(idParts).encode('raw_unicode_escape').decode('utf-8')
+
   def do_POST(self):
+    self.client_ip=self.headers.get('X-Forwarded-For')
+    self.client_id=self.get_client_id_from_beid(self.headers)
+    if len(self.client_id)<1:
+      self.client_id=self.client_ip
     clen=self.headers.get('content-length')
     if clen:
       clen=int(clen)
@@ -61,8 +77,17 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
       for line in shuttle.splitlines():
         if len(line)>0:
           try:
-            (label,value)=line.split('=')
-            self.server.put(label,value)
+            (_label,value)=line.split('=')
+            _labelparts=_label.split('.')
+            if _label.endswith('.responding'):
+              label='.'.join(_labelparts[:-1])
+              if value=='1':
+                self.server.set_responding(label,user=self.client_id)
+              else:
+                self.server.unset_responding(label)
+            elif _label.endswith('.responder.comment'):
+              label='.'.join(_labelparts)[:-2]
+              self.server.set_responding(label,user=self.client_id,comment=value)
             recordsPosted+=1
           except ValueError:
             self.server.log("Can't Parse [%s]" % (line))
@@ -73,12 +98,47 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
       self.body_response('Not A Valid Shuttle')
       
 
-class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out):
+class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out,Thread):
   def __init__(self):
     X3Out.__init__(self)
+    Thread.__init__(self,name='ChalicePostLoop')
+    self.daemon=True
+    self.responding={}
+    self.responding_lock=Lock()
     listen=(self.config['listen.addr'],int(self.config['listen.port']))
     HTTPServer.__init__(self,listen,HTTPChalicePostHandler)
     self.log("starting")
+    self.start()
     self.serve_forever()
+
+  def run(self):
+    self.running=True
+    while self.running:
+      with self.responding_lock:
+        for (label,resp_rec) in self.responding.items():
+          self.put('%s.responding' % (label,),1)
+          for (name,data) in resp_rec.items():
+            self.put('%s.%s' % (label,name,),data)
+      sleep(1)
+
+  def set_responding(self,label,user=None,comment=None):
+    self.log('set %s RESPONDING on %s with comment %s' % (user,label,comment,))
+    with self.responding_lock:
+      try:
+        resp_rec=self.responding[label]
+      except KeyError:
+        resp_rec={}
+        self.responding[label]=resp_rec
+      if user!=None:
+        resp_rec['responder']=user
+      if comment!=None:
+        resp_rec['comment']=comment
+  
+  def unset_responding(self,label):
+    self.log('unset RESPONDING on %s' % (label,))
+    with self.responding_lock:
+      del self.responding[label]
+      self.put('%s.responding' % (label,),0)
+    
 
 HTTPChalicePostServer()
