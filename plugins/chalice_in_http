@@ -81,20 +81,16 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
           try:
             (_label,value)=line.split('=')
             self.server.log(_label)
-            if _label=='user.photo':
-              self.server.put('%s.%s.name' % (self.server.prefix,self.client_id_label,),self.client_id)
-              self.server.put('%s.%s.photo' % (self.server.prefix,self.client_id_label,),value)
-            else:
-              _labelparts=_label.split('.')
-              if _label.endswith('.responding'):
-                label='.'.join(_labelparts[:-1])
-                if value=='1':
-                  self.server.set_responding(label,user=self.client_id)
-                else:
-                  self.server.unset_responding(label)
-              elif _label.endswith('.responder.comment'):
-                label='.'.join(_labelparts[:-2])
-                self.server.set_responding(label,user=self.client_id,comment=value)
+            _labelparts=_label.split('.')
+            if _label.endswith('.responding'):
+              label='.'.join(_labelparts[:-1])
+              if value=='1':
+                self.server.set_responding(label,user=self.client_id)
+              else:
+                self.server.unset_responding(label)
+            elif _label.endswith('.responder.comment'):
+              label='.'.join(_labelparts[:-2])
+              self.server.set_responding(label,user=self.client_id,comment=value)
             recordsPosted+=1
           except ValueError:
             self.server.log("Can't Parse [%s]" % (line))
@@ -129,7 +125,7 @@ class HTTPChalicePostServer(ThreadingMixIn,HTTPServer,X3Out,Thread):
             self.put('%s.responder.%s' % (label,name,),data)
       sleep(1)
 
-  def set_responding(self,label,user=None,comment=None,photo=None):
+  def set_responding(self,label,user=None,comment=None):
     self.log('set %s RESPONDING on %s with comment %s' % (user,label,comment,))
     with self.responding_lock:
       try:
