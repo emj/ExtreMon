@@ -46,8 +46,8 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
     self.wfile.write(textBytes)
     self.wfile.flush()
 
-#  def log_message(format,*args):
-#    pass
+  def log_message(format,*args):
+    pass
 
   def get_client_id_from_beid(self,headers):
     idParts=[]
@@ -80,7 +80,6 @@ class HTTPChalicePostHandler(BaseHTTPRequestHandler):
         if len(line)>0:
           try:
             (_label,value)=line.split('=')
-            self.server.log(_label)
             _labelparts=_label.split('.')
             if _label.endswith('.responding'):
               label='.'.join(_labelparts[:-1])
