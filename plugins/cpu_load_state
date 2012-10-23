@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)$
-#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)\.percentage$
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.load\.load\.(short|mid|long)term\.percentage)$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.load\.load\.(short|mid|long)term\.percentage)\.state$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -22,8 +22,9 @@
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
 from x3plugin import X3IO
+import re
 
-class MEM(X3IO):
+class LOADSTATE(X3IO):
   def __init__(self):
     self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
@@ -31,17 +32,16 @@ class MEM(X3IO):
 
   def receive(self,shuttle):
     for (label,value,captures) in shuttle:
+      value=float(value)
+      prefix=captures['prefix']
       try:
-        prefix=captures['prefix']
-        used=float(self.cached['%s.used' % (prefix)])
-        free=float(self.cached['%s.free' % (prefix)])
-        cached=float(self.cached['%s.cached' % (prefix)])
-        buffered=float(self.cached['%s.buffered' % (prefix)])
-        total=used+free+cached+buffered
-        self.put('%s.used.percentage' % (prefix),((used/total)*100.0))
-        self.put('%s.free.percentage' % (prefix),((free/total)*100.0))
-        self.put('%s.cached.percentage' % (prefix),((cached/total)*100.0))
-        self.put('%s.buffered.percentage' % (prefix),((buffered/total)*100.0))
+        if value>50.0:
+          self.put('%s.state' % (prefix,),'2')
+        elif value>25.0:
+          self.put('%s.state' % (prefix,),'1')
+        else:
+          self.put('%s.state' % (prefix,),'0')
       except KeyError:
         pass
-MEM()
+
+LOADSTATE()

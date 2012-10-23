@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)$
-#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)\.percentage$
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.cpu)\.(?P<core>[0-9]+)\.cpu\.idle$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.cpu\.cores$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -22,26 +22,28 @@
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
 from x3plugin import X3IO
+import re
 
-class MEM(X3IO):
+class CPUCoreCounter(X3IO):
   def __init__(self):
     self.log("running")
-    X3IO.__init__(self,cache=True,capture=True)
+    X3IO.__init__(self,capture=True)
+    self.highestcores={}
     self.receive_forever()
 
   def receive(self,shuttle):
     for (label,value,captures) in shuttle:
+      prefix=captures['prefix']
+      core=int(captures['core'])
       try:
-        prefix=captures['prefix']
-        used=float(self.cached['%s.used' % (prefix)])
-        free=float(self.cached['%s.free' % (prefix)])
-        cached=float(self.cached['%s.cached' % (prefix)])
-        buffered=float(self.cached['%s.buffered' % (prefix)])
-        total=used+free+cached+buffered
-        self.put('%s.used.percentage' % (prefix),((used/total)*100.0))
-        self.put('%s.free.percentage' % (prefix),((free/total)*100.0))
-        self.put('%s.cached.percentage' % (prefix),((cached/total)*100.0))
-        self.put('%s.buffered.percentage' % (prefix),((buffered/total)*100.0))
+        highest_core_seen=self.highestcores[prefix]
       except KeyError:
-        pass
-MEM()
+        self.log('adding %s' % (prefix,))
+        highest_core_seen=-1
+      if core>highest_core_seen:
+          self.highestcores[prefix]=core
+          self.put('%s.cores' % (prefix,),core+1)
+      else:
+          self.put('%s.cores' % (prefix,),highest_core_seen+1)
+
+CPUCoreCounter()

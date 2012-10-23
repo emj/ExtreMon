@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)$
-#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.memory\.memory)\.(used|free|cached|buffered)\.percentage$
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+)\.(cpu\.cores$|load\.load\.(short|mid|long)term$)
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.load\.load\.(short|mid|long)term.percentage$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -23,7 +23,7 @@
 #
 from x3plugin import X3IO
 
-class MEM(X3IO):
+class LOADPERCENTAGES(X3IO):
   def __init__(self):
     self.log("running")
     X3IO.__init__(self,cache=True,capture=True)
@@ -33,15 +33,14 @@ class MEM(X3IO):
     for (label,value,captures) in shuttle:
       try:
         prefix=captures['prefix']
-        used=float(self.cached['%s.used' % (prefix)])
-        free=float(self.cached['%s.free' % (prefix)])
-        cached=float(self.cached['%s.cached' % (prefix)])
-        buffered=float(self.cached['%s.buffered' % (prefix)])
-        total=used+free+cached+buffered
-        self.put('%s.used.percentage' % (prefix),((used/total)*100.0))
-        self.put('%s.free.percentage' % (prefix),((free/total)*100.0))
-        self.put('%s.cached.percentage' % (prefix),((cached/total)*100.0))
-        self.put('%s.buffered.percentage' % (prefix),((buffered/total)*100.0))
+        cores=float(self.cached['%s.cpu.cores' % (prefix,)])
+        shortterm=float(self.cached['%s.load.load.shortterm' % (prefix,)])
+        midterm=float(self.cached['%s.load.load.midterm' % (prefix,)])
+        longterm=float(self.cached['%s.load.load.longterm' % (prefix,)])
+        self.put('%s.load.load.shortterm.percentage' % (prefix),((shortterm/cores)*100.0))
+        self.put('%s.load.load.midterm.percentage' % (prefix),((midterm/cores)*100.0))
+        self.put('%s.load.load.longterm.percentage' % (prefix),((longterm/cores)*100.0))
       except KeyError:
         pass
-MEM()
+
+LOADPERCENTAGES()
