@@ -35,9 +35,9 @@ class LOADSTATE(X3IO):
       value=float(value)
       prefix=captures['prefix']
       try:
-        if value>50.0:
+        if value>100.0:
           self.put('%s.state' % (prefix,),'2')
-        elif value>25.0:
+        elif value>50.0:
           self.put('%s.state' % (prefix,),'1')
         else:
           self.put('%s.state' % (prefix,),'0')
