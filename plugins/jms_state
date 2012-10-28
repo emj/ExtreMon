@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+#.genericjmx.jms_queuejms.queue.trustserviceharvester.gauge.messagecount
+#x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.jms_queuejms\.queue\.(?P<queue>[a-z]+)\.gauge\.messagecount)$
+#x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.jms_queuejms\.queue\.(?P<queue>[a-z]+)\.gauge\.messagecount)\.state$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+import re
+
+class QSTATE(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,capture=True)
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    for (label,value,captures) in shuttle:
+      value=float(value)
+      prefix=captures['prefix']
+      queue=captures['queue']
+
+      if queue in ['dlq','expiryqueue']:
+        if value>0.0:
+          self.put('%s.state' % (prefix,),'2')
+        else:
+          self.put('%s.state' % (prefix,),'0')
+      else:
+        if value>2000.0:
+          self.put('%s.state' % (prefix,),'2')
+        elif value>0.0:
+          self.put('%s.state' % (prefix,),'1')
+        else:
+          self.put('%s.state' % (prefix,),'0')
+
+QSTATE()

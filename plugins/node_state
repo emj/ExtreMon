@@ -1,0 +1,81 @@
+#!/usr/bin/python3
+#x3.in.filter=^(?P<node>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por)\.app[1-9])\.(?P<subsystem>[a-z0-9._-]+)\.state$
+#x3.out.filter=^(?P<node>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por)\.app[1-9])\.state$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+import re
+
+class NODESTATE(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,capture=True)
+    self.nodes={}
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    for (label,value,captures) in shuttle:
+
+      try:
+        state=int(float(value))
+        if not state in range(0,4):
+          self.log('Invalid State [%d] for [%s]' % (state,label,))
+          continue
+      except ValueError:
+        self.log('Invalid State [%s] for [%s] Should Be Numeric 0-3' % (value,label,))
+        continue
+
+      try:
+        node=captures['node']
+        subsystem=captures['subsystem']
+      except KeyError:
+        self.log('Missing Node or SubSystem in [%s]' % (label,))
+
+      try:
+        (node_states,node_oldstates)=self.nodes[node]
+      except KeyError:
+        self.log('Initialising For Node [%s]' % (node,))
+        node_states={i:set() for i in range(0,4)}
+        node_oldstates={}
+        self.nodes[node]=(node_states,node_oldstates)
+
+      try:
+        old_state=node_oldstates[subsystem]
+        if state!=old_state:
+          old_state_set=node_states[old_state]
+          old_state_set.remove(subsystem)
+      except KeyError:
+        self.log('Initialising SubSystem[%s]' % (subsystem,))
+        old_state=state
+        node_oldstates[subsystem]=old_state
+        new_state_set=node_states[state]
+        new_state_set.add(subsystem)
+
+    for (node,(states,oldstates)) in self.nodes.items():
+      for state in range(3,-1,-1):
+        if len(states[state])>0:
+          self.put('%s.state' % (node,),state)
+          break
+        else:
+          continue
+
+        
+NODESTATE()

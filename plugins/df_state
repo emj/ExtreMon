@@ -28,7 +28,7 @@ free_thresholds={'root':(50,25),'boot':(75,50),'home':(20,5),
                  'opt':(75,60),'tmp':(80,75), 'var':(80,40),
                  'data':(50,25),'usr':(80,75),
                  'opt-app':(75,60),'opt-log':(90,80),'opt-tmp':(85,80),
-                 'sisadm':(95,90),'sftw':(10,5),
+                 'sisadm':(95,90),'sftw':(1,2),
                  'dev':(0,0),'dev-shm':(100,90),'run':(99,89),
                  'var-tmp':(99,89),'var-spool':(90,80)}
 

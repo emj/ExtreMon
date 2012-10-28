@@ -313,6 +313,7 @@ class Coven(object):
     self.prefix=prefix
     self.cauldronAddr=cauldronAddr
     self.plugins={}
+    self.plugins_lock=Lock()
     self.confRE=re.compile('^#\\s*x3\.([a-z0-9.]+)\\s*=\\s*(.*)\\s*$')
     self.dirManager=DirManager(self.path,self,ignore=ignore)
     self.cauldron=CauldronSender(self.cauldronAddr)
@@ -356,22 +357,23 @@ class Coven(object):
       self.dirManager.start()
       while True:
         totals={}
-        self.put('plugins.running',len(self.plugins))
-        for plugin in self.plugins.values():
-          for (values_type,values) in plugin.get_counters().items():
-            try:
-              total_values=totals[values_type]
-            except KeyError:
-              total_values={}
-              totals[values_type]=total_values
-            for (label,value) in values.items():
+        with self.plugins_lock:
+          self.put('plugins.running',len(self.plugins))
+          for plugin in self.plugins.values():
+            for (values_type,values) in plugin.get_counters().items():
               try:
-                total_values[label]+=value
+                total_values=totals[values_type]
               except KeyError:
-                total_values[label]=value
-              self.put('plugin.%s.%s.%s' %
+                total_values={}
+                totals[values_type]=total_values
+              for (label,value) in values.items():
+                try:
+                  total_values[label]+=value
+                except KeyError:
+                  total_values[label]=value
+                self.put('plugin.%s.%s.%s' %
                                 (plugin.name,values_type,label),value)
-          plugin.reset_counters()
+            plugin.reset_counters()
 
         for (values_type,values) in totals.items():
           for (label,value) in values.items():
@@ -380,10 +382,11 @@ class Coven(object):
     except KeyboardInterrupt:
       self.log("Stopping..")
       self.dirManager.stop()
-      for partingPlugin in self.plugins.values():
-        partingPlugin.stop()
-      for partingPlugin in self.plugins.values():
-        partingPlugin.join()
+      with self.plugins_lock:
+        for partingPlugin in self.plugins.values():
+          partingPlugin.stop()
+        for partingPlugin in self.plugins.values():
+          partingPlugin.join()
       self.log("Stopped..",priority=syslog.LOG_INFO)
 
 # ------------------------------------------------------------------------
@@ -393,11 +396,12 @@ class Coven(object):
     config=self.getConfig(name)
     if config:
       try:
-        self.plugins[name]=Plugin(name, self.getOSPath(name),
-                                 self.prefix, config, self.cauldronAddr,
-                                 self.log)
-        self.plugins[name].start()
-        self.log("Started %s" % (name),priority=syslog.LOG_INFO)
+        with self.plugins_lock:
+          self.plugins[name]=Plugin(name, self.getOSPath(name),
+                                   self.prefix, config, self.cauldronAddr,
+                                   self.log)
+          self.plugins[name].start()
+          self.log("Started %s" % (name),priority=syslog.LOG_INFO)
       except:
         self.log("Failed To Start %s" % (name),priority=syslog.LOG_ERR)
     else:
@@ -407,8 +411,9 @@ class Coven(object):
   def stopPlugin(self,name):
     self.log("Stopping %s" % (name))
     try:
-      self.plugins[name].stop()
-      del self.plugins[name]
+      with self.plugins_lock:
+        self.plugins[name].stop()
+        del self.plugins[name]
       self.log("Stopped %s" % (name),priority=syslog.LOG_INFO) 
     except:
       self.log("Failed To Stop %s" % (name),priority=syslog.LOG_ERR) 

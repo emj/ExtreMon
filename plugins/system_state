@@ -1,0 +1,81 @@
+#!/usr/bin/python3
+#x3.in.filter=^(?P<system>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por))\.(?P<subsystem>[a-z0-9._-]+)\.state$
+#x3.out.filter=^(?P<system>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por))\.state$
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+from x3plugin import X3IO
+import re
+
+class SYSTEMSTATE(X3IO):
+  def __init__(self):
+    self.log("running")
+    X3IO.__init__(self,capture=True)
+    self.systems={}
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    for (label,value,captures) in shuttle:
+
+      try:
+        state=int(float(value))
+        if not state in range(0,4):
+          self.log('Invalid State [%d] for [%s]' % (state,label,))
+          continue
+      except ValueError:
+        self.log('Invalid State [%s] for [%s] Should Be Numeric 0-3' % (value,label,))
+        continue
+
+      try:
+        system=captures['system']
+        subsystem=captures['subsystem']
+      except KeyError:
+        self.log('Missing System or SubSystem in [%s]' % (label,))
+
+      try:
+        (system_states,system_oldstates)=self.systems[system]
+      except KeyError:
+        self.log('Initialising For System [%s]' % (system,))
+        system_states={i:set() for i in range(0,4)}
+        system_oldstates={}
+        self.systems[system]=(system_states,system_oldstates)
+
+      try:
+        old_state=system_oldstates[subsystem]
+        if state!=old_state:
+          old_state_set=system_states[old_state]
+          old_state_set.remove(subsystem)
+      except KeyError:
+        self.log('Initialising SubSystem[%s]' % (subsystem,))
+        old_state=state
+        system_oldstates[subsystem]=old_state
+        new_state_set=system_states[state]
+        new_state_set.add(subsystem)
+
+    for (system,(states,oldstates)) in self.systems.items():
+      for state in range(3,-1,-1):
+        if len(states[state])>0:
+          self.put('%s.state' % (system,),state)
+          break
+        else:
+          continue
+
+        
+SYSTEMSTATE()

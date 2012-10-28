@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #x3.in.filter=^be\.(fedict|apsu|colifra)
-#x3.ignore=(sequence|comment)$
+#x3.ignore=(sequence|comment|responding|responder)$
 #x3.in.value.filter=^[0-9.]+$
 
 #
