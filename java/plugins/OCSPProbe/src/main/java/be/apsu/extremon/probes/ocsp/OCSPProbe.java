@@ -40,6 +40,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.codec.binary.Base64;
+import be.apsu.extremon.STATE;
 import be.apsu.extremon.plugin.X3Out;
 
 public class OCSPProbe extends X3Out

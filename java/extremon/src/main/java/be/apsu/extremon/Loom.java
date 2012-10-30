@@ -28,22 +28,8 @@ import java.util.concurrent.TimeUnit;
 
 public class Loom implements Runnable
 {
-	protected enum STATE
-	{
-		OK(0),WARNING(1),ALERT(2),MISSING(3),TACKLED(4);
-		
-		private byte code;
-		
-		STATE(int code)
-		{
-			this.code=(byte)code;
-		}
-		
-		byte getCode()
-		{
-			return this.code;
-		}
-	}
+	public static final int		DEFAULT_MAX_SHUTTLE_SIZE	=512;
+	public static final double	DEFAULT_MAX_SHUTTLE_AGE		=.5;
 	
 	private final LinkedBlockingQueue<X3Record> outQueue;
 	private final Thread						worker;
@@ -58,12 +44,21 @@ public class Loom implements Runnable
 	
 	public Loom()
 	{
-		this(512,.5);
+		this(DEFAULT_MAX_SHUTTLE_SIZE,DEFAULT_MAX_SHUTTLE_AGE);
 	}
 	
-	public Loom(int maxShuttleSize,double maxShuttleAge)
+	public Loom(String prefix)
 	{
-		super();
+		this(prefix,DEFAULT_MAX_SHUTTLE_SIZE,DEFAULT_MAX_SHUTTLE_AGE);
+	}
+	
+	public Loom(int maxShuttleSize, double maxShuttleAge)
+	{
+		this(null,maxShuttleSize,maxShuttleAge);
+	}
+	
+	public Loom(String prefix, int maxShuttleSize, double maxShuttleAge)
+	{
 		this.outQueue=new LinkedBlockingQueue<X3Record>();
 		this.worker=new Thread(this,"Loom");
 		this.worker.setDaemon(true);
@@ -76,21 +71,16 @@ public class Loom implements Runnable
 		this.lazy=false;
 		this.reset();
 	}
-	
-	public String getPrefix()
-	{
-		return prefix;
-	}
 
 	public void setPrefix(String prefix)
 	{
-		this.prefix = prefix;
+		this.prefix=prefix;
 	}
 
 	public Loom start(Launcher launcher)
 	{
 		if(launcher==null)
-			throw new NullPointerException("launcher is null.");
+			throw new NullPointerException("A Loom Requires a Non-null Launcher");
 		this.launcher=launcher;
 		this.worker.start();
 		return this;
@@ -147,11 +137,15 @@ public class Loom implements Runnable
 		return this;
 	}
 	
-	private String makeLabel(String suffix)
+	private String makeLabel(String label)
 	{
-		StringBuilder builder=new StringBuilder(this.prefix);
-		builder.append('.');
-		builder.append(suffix);
+		StringBuilder builder=new StringBuilder();
+		if(this.prefix!=null)
+		{
+			builder.append(this.prefix);
+			builder.append('.');
+		}
+		builder.append(label);
 		return builder.toString();
 	}
 	
@@ -199,9 +193,6 @@ public class Loom implements Runnable
 		}
 	}
 	
-
-
-
 	@Override
 	public void run()
 	{

@@ -30,6 +30,7 @@ import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
 
+import be.apsu.extremon.STATE;
 import be.apsu.extremon.plugin.X3Out;
 import be.fedict.trust.client.XKMS2Client;
 import be.fedict.trust.client.exception.RevocationDataNotFoundException;

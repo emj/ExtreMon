@@ -66,6 +66,7 @@ import org.bouncycastle.tsp.TimeStampToken;
 import org.bouncycastle.tsp.TimeStampTokenInfo;
 import org.bouncycastle.util.Store;
 
+import be.apsu.extremon.STATE;
 import be.apsu.extremon.plugin.X3Out;
 
 public class TSPProbe extends X3Out
@@ -133,7 +134,7 @@ public class TSPProbe extends X3Out
 		BigInteger 		requestNonce;
 		byte[] 			requestHashedMessage=new byte[20];
 		List<String> 	comments=new ArrayList<String>();
-		STATE			result=STATE.MISSING;
+		STATE			result=STATE.OK;
 		
 		log("running");
 		
