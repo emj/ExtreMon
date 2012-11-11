@@ -1,0 +1,62 @@
+#!/usr/bin/python3
+#x3.in.filter=^([a-z0-9._-]+)\.java\.ps_cputime\.(user|syst)$
+#x3.out.filter=^([a-z0-9._-]+)\.java\.ps_cputime\.(user|syst)\.avg(1|5|15)m$
+#x3.reject.outlier.above=50
+import shelve
+from math import pow,e
+
+#   ExtreMon Project
+#   Copyright (C) 2009-2012 Frank Marien
+#   frank@apsu.be
+#
+#   This file is part of ExtreMon.
+#
+#   ExtreMon is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   ExtreMon is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+from x3plugin import X3IO
+
+class Averages(X3IO):
+  def __init__(self):
+    self.log("running")
+    self.mmas={}
+    self.avgs={'1m':pow(e,(-1/60)),'5m':pow(e,(-1/300)),'15m':pow(e,(-1/900))}
+    X3IO.__init__(self)
+    try:
+      self.reject_outlier_above=float(self.config['reject.outlier.above'])
+    except KeyError:
+      self.reject_outlier_above=float('inf')
+    self.receive_forever()
+
+  def receive(self,shuttle):
+    for (label,_value) in shuttle:
+      try:
+        value=float(_value)
+        if value>self.reject_outlier_above:
+          self.log('Rejected Outlier Value %.3f for %s' % (value,label,))
+          continue
+        try:
+          ''' L=Q+M*(L-Q) '''
+          for period,modifier in self.avgs.items():
+            self.mmas[label][period]=value+modifier*(self.mmas[label][period]-value)
+            self.put('%s.avg%s' % (label,period,),'%.3f' % (self.mmas[label][period]))
+        except KeyError:
+          self.log("Initialising modified moving averages for %s" % (label,))
+          self.mmas[label]={}
+          for period in self.avgs.keys():
+            self.mmas[label][period]=value
+      except ValueError:
+        self.log("Can't parse \"%s\" as numeric (%s)" % (_value,label))
+
+Averages()

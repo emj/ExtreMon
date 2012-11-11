@@ -1,6 +1,6 @@
 #!/usr/bin/python3
-#x3.in.filter=^([a-z0-9._-]+)\.(responsetime|(ps_cputime\.(user|syst)))$
-#x3.out.filter=^([a-z0-9._-]+)\.(responsetime|(ps_cputime\.(user|syst)))\.avg(1|5|15)m$
+#x3.in.filter=^([a-z0-9._-]+)\.responsetime$
+#x3.out.filter=^([a-z0-9._-]+)\.responsetime\.avg(1|5|15)m$
 import shelve
 from math import pow,e
 
