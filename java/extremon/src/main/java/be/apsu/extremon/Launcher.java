@@ -16,12 +16,10 @@
  *                                                                         
  *   You should have received a copy of the GNU General Public License     
  *   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.     
- */  
+ */
 
 package be.apsu.extremon;
 
-
-public interface Launcher
-{
-	void launch(String shuttle);
+public interface Launcher {
+    void launch(String shuttle);
 }

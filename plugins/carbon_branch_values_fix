@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 #x3.whisper.dir=/data/graphite/storage/whisper/be/
 #x3.whisper.extension=wsp
-#x3.out.filter=^nada$
+#x3.out.filter=^nihil$
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -28,38 +28,34 @@ import pyinotify
 from x3plugin import X3Out
 
 # 
-# ExtreMon data sometimes has a hierarchy where a branch also has a value.
-# ..responsetime=123, ..responsetime.status=0, ...responsetime.status.comment=Fast Enough
-# This happens when some value was derived from another: it captures that relationship.
-# While a whisper db storage hierarchy can work on this data, bu default, a Graphite Dashboard using that
-# data will not see values which have derived ones. e.g. it expects
-# values to occur only at leaves, not branches.
-#
-# Fortunately, Christophe De Tiege discovered that a simply symlink can cause
-# the Graphite Dashboard to find the data anyway. This plugin takes a whisper directory
-# and makes sure that any directory (branch) that also contains a wsp file by the
-# same basename (=data values) has a symlink to that data file, causing the branch's
-# data to appear a a child node. Thanks CDT!
-#
+# ExtreMon data sometimes has a hierarchy where a branch also
+# has a value.  ..responsetime=123, ..responsetime.status=0,
+# ...responsetime.status.comment=Fast Enough # This happens when some
+# value was derived from another: it captures that relationship. 
+# While a whisper db storage hierarchy can work on this data, by default, 
+# a Graphite Dashboard using that data will not see values which have
+# derived ones. e.g. it expects values to occur only at leaves, not
+# branches. Fortunately, Christophe Van Reeth discovered that a simply
+# symlink causes the Graphite Dashboard to find the data anyway.
+# This plugin takes a whisper directory and makes sure that any
+# directory (branch) that also contains a wsp file by the # same basename
+# (=data values) has a symlink to that data file, causing the branch's 
+# data to appear as a child node. 
 
 class CarbonFix(pyinotify.ProcessEvent,X3Out):
     def __init__(self):
-      X3Out.__init__(self)
-      self.path=self.config['whisper.dir']
+      X3Out.__init__(self) self.path=self.config['whisper.dir']
       self.extension='.%s' % (self.config['whisper.extension'])
       self.log('fixing existing branches in [%s]' % (self.path))
-      self.fix_existing()
-      self.wm=pyinotify.WatchManager()
+      self.fix_existing() self.wm=pyinotify.WatchManager()
       self.notifier=pyinotify.Notifier(self.wm,self)
       self.log('acquiring recursive watch on [%s]' % (self.path))
       self.watch=self.wm.add_watch(   self.path,
                                       pyinotify.IN_CREATE,
                                       rec=True,auto_add=True)
-      self.log('watching for new branches to fix..')
-      while True:
+      self.log('watching for new branches to fix..')  while True:
         try:
-          self.notifier.process_events()
-          if self.notifier.check_events():
+          self.notifier.process_events() if self.notifier.check_events():
             self.notifier.read_events()
         except KeyboardInterrupt:
           self.notifier.stop()
@@ -74,7 +70,7 @@ class CarbonFix(pyinotify.ProcessEvent,X3Out):
     def fix_existing(self):
       for (root,kids,files) in os.walk(self.path):
         self.fix_carbon_node(root)
-    
+
     def symlink(self,source,link_name):
       try:
         os.symlink(source,link_name)

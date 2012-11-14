@@ -28,7 +28,7 @@ from queue        import Queue,Empty
 from extremon     import CauldronReceiver,CauldronSender
 import re,traceback,sys,signal,syslog,time
 
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class Countable(object):
   def __init__(self):
@@ -134,7 +134,7 @@ class CauldronToPlugin(Thread,Countable):
     self.running=False
 
 
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class PluginToCauldron(Thread,Countable):
   def __init__(self,name,cauldronAddr,plugin,log,
@@ -192,7 +192,7 @@ class PluginToCauldron(Thread,Countable):
   def stop(self):
     self.running=False
 
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class Plugin(Thread):
   def __init__(self,name,path,prefix,config,cauldronAddr,log):
@@ -303,7 +303,7 @@ class Plugin(Thread):
     if self.c2p:
       self.c2p.reset_counters()
 
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 class Coven(object):
   def __init__( self,path,prefix,cauldronAddr,
@@ -389,7 +389,7 @@ class Coven(object):
           partingPlugin.join()
       self.log("Stopped..",priority=syslog.LOG_INFO)
 
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
   def startPlugin(self,name):
     self.log("Starting %s" % (name)) 
@@ -418,7 +418,7 @@ class Coven(object):
     except:
       self.log("Failed To Stop %s" % (name),priority=syslog.LOG_ERR) 
 
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
   def process_FileCreated(self,name):
     self.startPlugin(name)
@@ -431,7 +431,7 @@ class Coven(object):
     self.stopPlugin(name)
     self.startPlugin(name)
   
-# ------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 if __name__=='__main__':
   signal.signal(signal.SIGCHLD, signal.SIG_IGN)

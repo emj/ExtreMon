@@ -27,12 +27,15 @@
 #   You should have received a copy of the GNU General Public License
 #   along with ExtreMon.  If not, see <http://www.gnu.org/licenses/>.
 #
-# *Heavily* based on collectd_network.py:
+# Based on collectd_network.py:
 # https://github.com/octo/collectd/blob/master/contrib/collectd_network.py
-# which is Copyright © 2009 Adrian Perez <aperez@igalia.com>
-# Adrian did all the truly hard stuff parsing the binary format, and
-# gracefully upgraded the licence to GPLv3 for me.
-# All the bugs are mine :-)
+# which is Copyright (c) 2009-2012 Adrian Perez <aperez@igalia.com>
+# Adrian did all the truly hard stuff parsing the binary format, back in
+# 2009, and gracefully upgraded the licence to GPLv3 for me, in 2012,
+# so that I could add the high-resolution versions that had been added
+# to collectd in the mean time, and finally use the core code to
+# produce this ExtreMon plugin, which also parses the collectd types
+# files. All bugs introduced since 2009 are therefore mine.
 #
 
 import socket,struct,sys,re,time

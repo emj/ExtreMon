@@ -34,119 +34,102 @@ import java.util.logging.Logger;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 
-public class X3Source implements Runnable
-{
-	private static final int	RETRY_DELAY	=2000;
-	private static final Logger	LOGGER		=Logger.getLogger(X3Source.class.getName());
+public class X3Source implements Runnable {
+    private static final int RETRY_DELAY = 2000;
+    private static final Logger LOGGER = Logger.getLogger(X3Source.class
+	    .getName());
 
-	private String				name;
-	private URL					url;
-	private X3SourceListener	listener;
-	private boolean				running;
-	private SSLSocketFactory	socketFactory;
+    private String name;
+    private URL url;
+    private X3SourceListener listener;
+    private boolean running;
+    private SSLSocketFactory socketFactory;
 
-	
-	public X3Source(String name,URL url)
-	{
-		super();
-		this.name=name;
-		this.url=url;
-	}
-	
-	public void setSocketFactory(SSLSocketFactory socketFactory)
-	{
-		this.socketFactory=socketFactory;
-	}
+    public X3Source(String name, URL url) {
+	super();
+	this.name = name;
+	this.url = url;
+    }
 
-	public final X3Source start(X3SourceListener aListener)
-	{
-		this.listener=aListener;
-		new Thread(this,"X3Source ["+this.url.toString()+"]").start();
-		return this;
-	}
+    public void setSocketFactory(SSLSocketFactory socketFactory) {
+	this.socketFactory = socketFactory;
+    }
 
-	public final X3Source stop()
-	{
-		this.running=false;
-		return this;
-	}
+    public final X3Source start(X3SourceListener aListener) {
+	this.listener = aListener;
+	new Thread(this, "X3Source [" + this.url.toString() + "]")
+		.start();
+	return this;
+    }
 
-	@Override
-	public final void run()
-	{
-		this.running=true;
-		while(this.running)
-		{
-			try
-			{
-				final HttpsURLConnection connection=(HttpsURLConnection)this.url.openConnection();
+    public final X3Source stop() {
+	this.running = false;
+	return this;
+    }
 
-				if(this.socketFactory!=null)
-					connection.setSSLSocketFactory(this.socketFactory);
+    @Override
+    public final void run() {
+	this.running = true;
+	while (this.running) {
+	    try {
+		final HttpsURLConnection connection = (HttpsURLConnection) this.url
+			.openConnection();
 
-				final BufferedReader reader=new BufferedReader(new InputStreamReader(connection.getInputStream(),"UTF-8"));
-				final List<X3Measure> lines=new ArrayList<X3Measure>();
-				String line;
-				double timeStamp=0;
+		if (this.socketFactory != null)
+		    connection.setSSLSocketFactory(this.socketFactory);
 
-				this.listener.sourceConnected(this);
+		final BufferedReader reader = new BufferedReader(
+			new InputStreamReader(
+				connection.getInputStream(), "UTF-8"));
+		final List<X3Measure> lines = new ArrayList<X3Measure>();
+		String line;
+		double timeStamp = 0;
 
-				while(this.running&&(line=reader.readLine())!=null)
-				{
-					if(line.length()==0)
-					{
-						this.listener.sourceData(this,timeStamp,lines);
-						lines.clear();
-						timeStamp=0;
-					}
-					else
-					{
-						final String[] labelValue=line.split("=");
-						if(labelValue.length==2)
-						{
-							lines.add(new X3Measure(labelValue[0],labelValue[1]));
+		this.listener.sourceConnected(this);
 
-							if(labelValue[0].endsWith("timestamp"))
-							{
-								try
-								{
-									timeStamp=Double.parseDouble(labelValue[1]);
-								}
-								catch(NumberFormatException nfe)
-								{
-									LOGGER.log(Level.SEVERE,"failed to parse timestamp",nfe);
-								}
-							}
-						}
-					}
+		while (this.running && (line = reader.readLine()) != null) {
+		    if (line.length() == 0) {
+			this.listener.sourceData(this, timeStamp, lines);
+			lines.clear();
+			timeStamp = 0;
+		    } else {
+			final String[] labelValue = line.split("=");
+			if (labelValue.length == 2) {
+			    lines.add(new X3Measure(labelValue[0],
+				    labelValue[1]));
+
+			    if (labelValue[0].endsWith("timestamp")) {
+				try {
+				    timeStamp = Double
+					    .parseDouble(labelValue[1]);
+				} catch (NumberFormatException nfe) {
+				    LOGGER.log(Level.SEVERE,
+					    "failed to parse timestamp",
+					    nfe);
 				}
-
-				reader.close();
-				this.listener.sourceDisconnected(this);
+			    }
 			}
-			catch(UnknownHostException ex)
-			{
-				LOGGER.log(Level.SEVERE,null,ex);
-			}
-			catch(IOException ex)
-			{
-				LOGGER.log(Level.SEVERE,null,ex);
-				this.listener.sourceDisconnected(this);
-			}
-
-			try
-			{
-				Thread.sleep(RETRY_DELAY);
-			}
-			catch(InterruptedException ex)
-			{
-				LOGGER.log(Level.SEVERE,null,ex);
-			}
+		    }
 		}
-	}
 
-	public final String getName()
-	{
-		return this.name;
+		reader.close();
+		this.listener.sourceDisconnected(this);
+	    } catch (UnknownHostException ex) {
+		LOGGER.log(Level.SEVERE, null, ex);
+	    } catch (IOException ex) {
+		LOGGER.log(Level.SEVERE, null, ex);
+		this.listener.sourceDisconnected(this);
+	    }
+
+	    try {
+		Thread.sleep(RETRY_DELAY);
+	    } catch (InterruptedException ex) {
+		LOGGER.log(Level.SEVERE, null, ex);
+	    }
 	}
+    }
+
+    public final String getName() {
+	return this.name;
+    }
 }

@@ -29,7 +29,10 @@ import java.util.List;
  */
 public interface X3SourceListener
 {
-	void sourceConnected(X3Source source);
-	void sourceDisconnected(X3Source source);
-	void sourceData(X3Source source,double timeStamp,List<X3Measure> measures);
+  void sourceConnected(X3Source source);
+
+  void sourceDisconnected(X3Source source);
+
+  void sourceData(X3Source source,double timeStamp,
+    List<X3Measure> measures);
 }

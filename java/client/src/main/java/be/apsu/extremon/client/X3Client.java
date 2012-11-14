@@ -29,93 +29,89 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class X3Client implements X3SourceListener
-{
-	private static final Logger						LOGGER	=Logger.getLogger(X3Client.class.getName());
+public class X3Client implements X3SourceListener {
+    private static final Logger LOGGER = Logger.getLogger(X3Client.class
+	    .getName());
 
-	private Set<X3Source>							sources;
-	private Set<X3ClientListener>					listeners;
-	private Map<String,Map<X3Source,X3TimeValue>>	cache;
-	private Set<X3Measure>							shuttle;
+    private Set<X3Source> sources;
+    private Set<X3ClientListener> listeners;
+    private Map<String, Map<X3Source, X3TimeValue>> cache;
+    private Set<X3Measure> shuttle;
 
-	public X3Client()
-	{
-		super();
-		this.sources=new HashSet<X3Source>();
-		this.listeners=new HashSet<X3ClientListener>();
-		this.cache=new HashMap<String,Map<X3Source,X3TimeValue>>();
-		this.shuttle=new HashSet<X3Measure>();
-	}
+    public X3Client() {
+	super();
+	this.sources = new HashSet<X3Source>();
+	this.listeners = new HashSet<X3ClientListener>();
+	this.cache = new HashMap<String, Map<X3Source, X3TimeValue>>();
+	this.shuttle = new HashSet<X3Measure>();
+    }
 
-	public final void addSource(X3Source source)
-	{
-		this.sources.add(source);
-		source.start(this);
-	}
+    public final void addSource(X3Source source) {
+	this.sources.add(source);
+	source.start(this);
+    }
 
-	public final void removeSource(X3Source source)
-	{
-		source.stop();
-		this.sources.add(source);
-	}
+    public final void removeSource(X3Source source) {
+	source.stop();
+	this.sources.add(source);
+    }
 
-	public final void addListener(X3ClientListener listener)
-	{
-		this.listeners.add(listener);
-	}
+    public final void addListener(X3ClientListener listener) {
+	this.listeners.add(listener);
+    }
 
-	public final void removeListener(final X3ClientListener listener)
-	{
-		this.listeners.remove(listener);
-	}
+    public final void removeListener(final X3ClientListener listener) {
+	this.listeners.remove(listener);
+    }
 
-	@Override
-	public void sourceConnected(X3Source source)
-	{
-	}
+    @Override
+    public void sourceConnected(X3Source source) {
+    }
 
-	@Override
-	public void sourceDisconnected(X3Source source)
-	{
-	}
+    @Override
+    public void sourceDisconnected(X3Source source) {
+    }
 
-	@Override
-	public final synchronized void sourceData(X3Source source,double timeStamp,List<X3Measure> measures)
-	{
-		for(X3Measure measure:measures)
-		{
-			LOGGER.log(Level.FINEST,"SOURCEDATA "+source.getName()+" ["+measure.getLabel()+"="+measure.getValue()+"]");
+    @Override
+    public final synchronized void sourceData(X3Source source,
+	    double timeStamp, List<X3Measure> measures) {
+	for (X3Measure measure : measures) {
+	    LOGGER.log(
+		    Level.FINEST,
+		    "SOURCEDATA " + source.getName() + " ["
+			    + measure.getLabel() + "="
+			    + measure.getValue() + "]");
 
-			Map<X3Source,X3TimeValue> sourceTimeValue=this.cache.get(measure.getLabel());
+	    Map<X3Source, X3TimeValue> sourceTimeValue = this.cache
+		    .get(measure.getLabel());
 
-			if(sourceTimeValue==null)
-			{
-				LOGGER.finest("\tADDLBL "+measure.getLabel()+"("+source.getName()+")");
-				sourceTimeValue=new HashMap<X3Source,X3TimeValue>();
-				sourceTimeValue.put(source,new X3TimeValue(timeStamp,measure.getValue()));
-				this.cache.put(measure.getLabel(),sourceTimeValue);
-			}
-			else
-			{
-				X3TimeValue timeValue=sourceTimeValue.get(source);
-				if(timeValue==null)
-				{
-					LOGGER.finest("\tADDSRC "+measure.getLabel()+"("+source.getName()+")");
-					timeValue=new X3TimeValue(timeStamp,measure.getValue());
-					sourceTimeValue.put(source,timeValue);
-				}
-				else
-				{
-					LOGGER.finest("\tUPDATE "+measure.getLabel()+"("+source.getName()+")");
-					timeValue.setValue(measure.getValue());
-				}
-			}
-
-			this.shuttle.add(measure);
+	    if (sourceTimeValue == null) {
+		LOGGER.finest("\tADDLBL " + measure.getLabel() + "("
+			+ source.getName() + ")");
+		sourceTimeValue = new HashMap<X3Source, X3TimeValue>();
+		sourceTimeValue.put(source, new X3TimeValue(timeStamp,
+			measure.getValue()));
+		this.cache.put(measure.getLabel(), sourceTimeValue);
+	    } else {
+		X3TimeValue timeValue = sourceTimeValue.get(source);
+		if (timeValue == null) {
+		    LOGGER.finest("\tADDSRC " + measure.getLabel() + "("
+			    + source.getName() + ")");
+		    timeValue = new X3TimeValue(timeStamp,
+			    measure.getValue());
+		    sourceTimeValue.put(source, timeValue);
+		} else {
+		    LOGGER.finest("\tUPDATE " + measure.getLabel() + "("
+			    + source.getName() + ")");
+		    timeValue.setValue(measure.getValue());
 		}
+	    }
 
-		for(X3ClientListener listener:this.listeners)
-			listener.clientData(this,this.shuttle);
-		this.shuttle.clear();
+	    this.shuttle.add(measure);
 	}
+
+	for (X3ClientListener listener : this.listeners)
+	    listener.clientData(this, this.shuttle);
+	this.shuttle.clear();
+    }
 }

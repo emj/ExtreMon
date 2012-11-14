@@ -200,51 +200,6 @@ class CauldronSender(Loom):
   def launch(self,shuttle):
       self.sock.sendto(bytes(shuttle,'utf-8'),self.mcast_addr)
 
-class CauldronLabelFilter:
-
-  """ Base class for filtering the labels of label-value pairs boiling, 
-    *between* ports in a boiling cauldron.
-  
-    Pass two (address,port) tuples indicating the mcast group/port to 
-    listen for values, and the mcast group/port to write filtered 
-    values to, call filter_forever (blocks).
-  
-    Subclasses should implement the filter_label() method which takes a 
-    label and returns a label, after whatever filtering it applies.
-    Note that the subclasses' filter_label method is only called once
-    per unique label, as the CauldronLabelFilter will cache the result
-    and use the cached label without calling the filter_label again.
-  """
-  
-  def __init__( self,in_addr,out_addr,max_shuttle_size=128,
-                max_shuttle_age=.1):
-    self.receiver=CauldronReceiver(mcast_addr=in_addr,handler=self)
-    self.sender=CauldronSender( mcast_addr=out_addr,
-                                max_shuttle_size=max_shuttle_size,
-                                max_shuttle_age=max_shuttle_age)
-    self.cache={}
-    self.receiver.receive_shuttle()
-
-    
-  def filter_forever(self):
-    self.receiver.receive_forever()
-
-
-  def handle_shuttle(self,shuttle):
-    for (old_label,value) in shuttle:
-      try:
-        label=self.cache[old_label]
-      except KeyError:
-        label=self.filter_label(old_label)
-        self.cache[old_label]=label
-      self.sender.put(label,value)
-
-  def filter_label(self,label):
-    raise NotImplementedError(  "Subclasses of CauldronLabelFilter "
-                                "should implement a filter_label "
-                                "method")
-
-
 class CauldronServer(Thread):
   """ Base class for streaming servers that serve full boiling cauldrons.
   
