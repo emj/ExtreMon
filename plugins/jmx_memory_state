@@ -27,7 +27,7 @@ import re
 used_thresholds={'edenspace':(101,101),'paredenspace':(101,101),
                  'survivorspace':(50,75),'parsurvivorspace':(50,75),
                  'cmsoldgen':(40,60),'cmspermgen':(50,75),
-                 'codecache':(40,60)}
+                 'codecache':(50,75)}
 
 class JAVAMEMSTATE(X3IO):
   def __init__(self):

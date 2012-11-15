@@ -25,9 +25,9 @@ from x3plugin import X3IO
 import re
 
 thresh={'used'    :{'alrt':{'low':0,'high':50},'warn':{'low':10,'high':40}},
-        'cached'  :{'alrt':{'low':20,'high':100},'warn':{'low':40,'high':90}},
+        'cached'  :{'alrt':{'low':10,'high':100},'warn':{'low':20,'high':90}},
         'buffered':{'alrt':{'low':5,'high':50},'warn':{'low':10,'high':40}},
-        'free'    :{'alrt':{'low':0,'high':30},'warn':{'low':0,'high':20}}}
+        'free'    :{'alrt':{'low':0,'high':80},'warn':{'low':0,'high':90}}}
 
 class MEMState(X3IO):
   def __init__(self):
