@@ -47,10 +47,10 @@ class DNSProbe(X3Out):
             break
         if ok:
             self.put('%s.state' % (self.prefix),'0')
-            self.put('%s.state.comment' % (self.prefix),'ok, secure.globalsign.net within [%s]' % (self.config['expected.a.records']))
+            self.put('%s.state.comment' % (self.prefix),'ok, %s within [%s]' % (self.config['a.query'],self.config['expected.a.records']))
         else:
             self.put('%s.state' % (self.prefix),'2')
-            self.put('%s.state.comment' % (self.prefix),'alert, secure.globalsign.net no longer within [%s]' % (self.config['expected.a.records']))
+            self.put('%s.state.comment' % (self.prefix),'alert, %s no longer within [%s]' % (self.config['a.query'],self.config['expected.a.records']))
       except:
         self.put('%s.result' % (self.prefix),'1')
         self.put('%s.state.comment' % (self.prefix),'DNS probe fails to get results.. please fix me')
