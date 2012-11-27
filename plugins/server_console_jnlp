@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.listen.addr=localhost
 #x3.listen.port=17717
 #x3.prefix=be.fedict.eid.mon.isolde

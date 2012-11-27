@@ -1,12 +1,12 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 #
 #	ExtreMon Project
 #	Copyright (C) 2009-2012 Frank Marien
 #	frank@apsu.be
-#  
+#
 #	This file is part of ExtreMon.
-#    
+#
 #	ExtreMon is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
 #	the Free Software Foundation, either version 3 of the License, or
@@ -33,7 +33,7 @@ class TCPCauldronRequestHandler(BaseRequestHandler):
 		self.outq=Queue()
 		self.running=True
 		self.server.add_consumer(self)
-	
+
 	def handle(self):
 		while self.running:
 			try:

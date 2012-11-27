@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -37,15 +37,15 @@ class PrintingDirWatcher(object):
         print()
 
     def process_FileCreated(self,name):
-        print("%s created" % (name)) 
+        print("%s created" % (name))
         self.current.add(name)
         self.printcurrent()
 
     def process_FileChanged(self,name):
-        print("%s changed" % (name)) 
+        print("%s changed" % (name))
 
     def process_FileDeleted(self,name):
-        print("%s deleted" % (name)) 
+        print("%s deleted" % (name))
         self.current.remove(name)
         self.printcurrent()
 
@@ -53,7 +53,7 @@ class PrintingDirWatcher(object):
 """ DirManager takes a path in the filesystem and a DirWatcher,
     uses PyInotify to capture events on that path, and calls
     the DirWatcher with a somewhat higher-level interface.
-    Note that while starting up, files already present will 
+    Note that while starting up, files already present will
     cause "Created" notifications, for consistency """
 
 class DirManager(pyinotify.ProcessEvent):
@@ -67,7 +67,7 @@ class DirManager(pyinotify.ProcessEvent):
         self.ignore=[]
         if ignore:
             for regex in ignore:
-                self.ignore.append(re.compile(regex, re.UNICODE)) 
+                self.ignore.append(re.compile(regex, re.UNICODE))
 
         self.watch=self.wm.add_watch(   path,
                                         pyinotify.IN_DELETE|

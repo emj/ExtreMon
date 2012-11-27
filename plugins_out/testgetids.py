@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 import urllib2,json
 
 def getIDs(screenNames):
@@ -7,7 +7,7 @@ def getIDs(screenNames):
                  "lookup.json?screen_name=%s"
                  "&include_entities=false" % (','.join(screenNames)))
     return dict((profile['screen_name'],profile['id_str']) for profile in json.load(stream))
-  except urllib2.HTTPError: 
+  except urllib2.HTTPError:
     return []
 
 print getIDs(['fedtron,BartHanssens'])

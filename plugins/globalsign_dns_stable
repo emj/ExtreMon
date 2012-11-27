@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.prefix=be.fedict.eid.ext.globalsign.dns
 #x3.delay=1000
 #x3.a.query=secure.globalsign.net

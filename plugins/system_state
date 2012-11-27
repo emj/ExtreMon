@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=^(?P<system>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por))\.(?P<subsystem>[a-z0-9._-]+)\.state$
 #x3.out.filter=^(?P<system>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por))\.state$
 

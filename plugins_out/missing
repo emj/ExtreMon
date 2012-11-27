@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=state$
 #x3.out.filter=state$
 #x3.loop.protected=yes

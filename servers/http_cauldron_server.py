@@ -1,12 +1,12 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 #
 #	ExtreMon Project
 #	Copyright (C) 2009-2012 Frank Marien
 #	frank@apsu.be
-#  
+#
 #	This file is part of ExtreMon.
-#    
+#
 #	ExtreMon is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
 #	the Free Software Foundation, either version 3 of the License, or
@@ -51,14 +51,14 @@ class HTTPCauldronRequestHandler(BaseHTTPRequestHandler):
 				except error:
 					self.running=False
 		finally:
-			self.server.remove_consumer(self)	
+			self.server.remove_consumer(self)
 
 	def write(self,data):
 		try:
 			self.outq.put(data,block=False)
 		except Full:
 			pass
-			
+
 class HTTPCauldronServer(ThreadingMixIn,CauldronServer,HTTPServer):
 	def __init__(self,listen,prefix):
 		HTTPServer.__init__(self,listen, HTTPCauldronRequestHandler)
