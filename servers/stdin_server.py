@@ -1,12 +1,12 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 #
 #	ExtreMon Project
 #	Copyright (C) 2009-2012 Frank Marien
 #	frank@apsu.be
-#  
+#
 #	This file is part of ExtreMon.
-#    
+#
 #	ExtreMon is free software: you can redistribute it and/or modify
 #	it under the terms of the GNU General Public License as published by
 #	the Free Software Foundation, either version 3 of the License, or
@@ -37,7 +37,7 @@ class StdInCauldronRequestHandler(Thread):
 		self.daemon=True
 		self.server=server
 		self.path=path
-	
+
 	def run(self):
 		self.outq=Queue(maxsize=10)
 		self.server.add_consumer(self)
@@ -53,7 +53,7 @@ class StdInCauldronRequestHandler(Thread):
 				except error:
 					self.running=False
 		finally:
-			self.server.remove_consumer(self)	
+			self.server.remove_consumer(self)
 
 	def write(self,data):
 		try:
@@ -103,7 +103,7 @@ class StdInCauldronServer(Thread,pyinotify.ProcessEvent):
 		process=StdInCauldronRequestHandler(self.cauldronserver,path)
 		self.boiling[path]=process
 		process.start()
-	
+
 	def write(self,data):
 		self.cauldronserver.write(data)
 

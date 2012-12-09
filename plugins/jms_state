@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #.genericjmx.jms_queuejms.queue.trustserviceharvester.gauge.messagecount
 #x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.jms_queuejms\.queue\.(?P<queue>[a-z]+)\.gauge\.messagecount)$
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.jms_queuejms\.queue\.(?P<queue>[a-z]+)\.gauge\.messagecount)\.state$

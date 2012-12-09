@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.trust\.app[1-9]\.snmp\.(?P<metric>counter\.failure_crl|counter\.cache_misses|gauge\.cache_hit_percent))$
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.trust\.app[1-9]\.snmp\.(?P<metric>counter\.failure_crl|counter\.cache_misses|gauge\.cache_hit_percent))\.state$
 

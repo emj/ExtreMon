@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 #x3.url=https://idp.services.belgium.be/eid-idp/identity.pem
 #x3.prefix=be.fedict.eid.prod.idp.ws.cert
 #x3.error.comment=Unable To Acquire Certificate

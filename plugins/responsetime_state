@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.alert.threshold=1000
 #x3.warning.threshold=500
 #x3.in.filter=^(?P<prefix>[a-z0-9._-]+)\.(?P<measure>responsetime|result|result\.comment|responsetime\.average)$

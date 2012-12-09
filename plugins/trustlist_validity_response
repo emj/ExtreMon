@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.prefix=be.fedict.eid.ext.tsl
 #x3.url=http://tsl.belgium.be/tsl-be.xml
 #x3.delay=1000

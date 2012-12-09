@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 #x3.prefix=com.twitter.tweet
 #x3.out.filter=^com\.twitter\.tweet\.([a-zA-z0-9]+)\.([0-9]+)\.(text|screen_name|name|profile_image_url)$
 

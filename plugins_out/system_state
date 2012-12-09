@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=^(?P<prefix>be\.fedict\.eid\.(prod)\.[a-z0-9-]+)\.(.*)\.state$
 #x3.out.filter=^(?P<prefix>be\.fedict\.eid\.(prod)\.[a-z0-9-]+)\.state$
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.types.db=/opt/collectd/share/collectd/types.db
 #x3.types.db.custom=/opt/collectd/share/collectd/types.db.custom
 #x3.zapgremlins=[^a-z0-9._/;:-]+

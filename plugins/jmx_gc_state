@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.(gc-concurrentmarksweep|gc-parnew|gc-copy)\.(total_time_in_ms\.collection_time|invocations))$
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.(gc-concurrentmarksweep|gc-parnew|gc-copy)\.(total_time_in_ms\.collection_time|invocations))\.state$
 
