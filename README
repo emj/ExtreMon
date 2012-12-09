@@ -38,3 +38,68 @@ and Re-use as many ubiquitous technologies as possible
 see https://extremon.org/
 
 For the second target, see the ExtreMon-Display project
+
+INSTALLATION WITH VIRTUALENV
+----------------------------
+Make sure python3 is installed. Inotify should be compiled in your kernel.
+
+Clone the git repository to a directory on your computer
+
+    git clone https://github.com/m4rienf/ExtreMon.git extremon
+
+Install a virtualenv
+
+    cd extremon
+    virtualenv -p /usr/bin/python3 ENV
+
+Start the newly created environment ENV. You should do this every time you want
+to run extremon.
+
+    source ./ENV/bin/activate
+
+Create a directory for enabled plugins. Copy plugins you want to enable.
+
+    mkdir ./plugins-enabled
+    cp ./plugins/from_collectd ./plugins-enabled
+
+Edit coven.py. At the bottom of the file, enter you plugins directory and the name of your host
+
+      coven=Coven(path.abspath('./plugins-enabled'),'extre.mon',('224.0.0.1',1249))
+
+Start the coven and see what's missing
+
+    ./coven.py
+    # open another terminal to view your syslog output 
+    tail -f /var/log/syslog # or whatever your syslog writes to
+
+Install missing python modules eg:
+
+     pip install pyinotify
+
+To see what's passing by:
+
+     ./dump.py
+
+GET YOUR LOCAL collectd INSTALL FORWARDING DATA TO EXTREMON
+---------------------------------------------------------------
+Update the configuration of the from_collectd plugin. Edit ./plugins-enabled/from_collectd
+
+    ## point to the types.db of your collectd install
+    #x3.types.db=/usr/share/collectd/types.db
+    ## point to a custom types.db. enter /dev/null if you don't have one
+    #x3.types.db.custom=/dev/null
+    #x3.out.filter=^.
+
+Once saved, the plugin will be reloaded by the coven.
+
+Add  these lines to your collect configuration:
+
+    LoadPlugin network
+    <Plugin "network">
+        <Server "224.0.0.1" "1250">
+          Interface "lo"
+        </Server>
+    </Plugin>
+
+Restart collectd
+

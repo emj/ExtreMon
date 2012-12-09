@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import pstats
 p=pstats.Stats('/tmp/carbon-client.profile')
 p.sort_stats('cumulative').print_stats(50)

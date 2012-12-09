@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 #x3.url=https://dss.services.belgium.be/eid-dss/identity.pem
 #x3.prefix=be.fedict.eid.prod.dss.ws.cert
 #x3.error.comment=Unable To Acquire Certificate

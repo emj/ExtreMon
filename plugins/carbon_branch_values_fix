@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.whisper.dir=/data/graphite/storage/whisper/be/
 #x3.whisper.extension=wsp
 #x3.out.filter=^nihil$

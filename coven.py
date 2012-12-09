@@ -1,4 +1,4 @@
-#!/usr/bin/python3 
+#!/usr/bin/env python3
 
 #   ExtreMon Project
 #   Copyright (C) 2009-2012 Frank Marien
@@ -67,7 +67,7 @@ class CauldronToPlugin(Thread,Countable):
     self.loopProtected=loopProtected
 
     if outFilter:
-      self.outFilter=re.compile(outFilter) 
+      self.outFilter=re.compile(outFilter)
     else:
       self.outFilter=None
 
@@ -80,7 +80,7 @@ class CauldronToPlugin(Thread,Countable):
       self.outValueFilter=re.compile(outValueFilter)
     else:
       self.outValueFilter=None
-  
+
   def run(self):
     self.running=True
     self.log("running")
@@ -98,9 +98,9 @@ class CauldronToPlugin(Thread,Countable):
         self.count('new_labels_per_second',1)
 
         if self.loopProtected:
-          allowLabel=self.inFilter.search(label)!=None 
+          allowLabel=self.inFilter.search(label)!=None
         else:
-          allowLabel=((( self.inFilter.search(label)!=None) and (((self.outFilter==None or not ( self.outFilter.search(label)!=None)))))) 
+          allowLabel=((( self.inFilter.search(label)!=None) and (((self.outFilter==None or not ( self.outFilter.search(label)!=None))))))
 
         if self.inValueFilter==None:
           allowValueIn=True
@@ -242,7 +242,7 @@ class Plugin(Thread):
                         env=newEnvironment,
                         start_new_session=True)
 
-    ''' if input plugin, connect C2P thread to handle stdin '''    
+    ''' if input plugin, connect C2P thread to handle stdin '''
     if 'in.filter' in self.config:
       self.c2p=CauldronToPlugin(self.name,self.cauldronAddr,
                      self.process.stdin,
@@ -332,7 +332,7 @@ class Coven(object):
     return False
 
   def getConfig(self,name):
-    pluginPath=self.getOSPath(name)    
+    pluginPath=self.getOSPath(name)
     if not self.isShebangExecutable(pluginPath):
       return None
     conf={}
@@ -348,9 +348,9 @@ class Coven(object):
 
   def put(self,label,value):
     self.cauldron.put('%s.coven.%s' % (self.prefix,label),value)
-  
+
   def log(self,message,component=None,priority=syslog.LOG_DEBUG):
-    syslog.syslog(priority,message if component==None 
+    syslog.syslog(priority,message if component==None
                                 else '[%s] %s' % (component,message))
   def practice(self):
     try:
@@ -392,7 +392,7 @@ class Coven(object):
 # ----------------------------------------------------------------------
 
   def startPlugin(self,name):
-    self.log("Starting %s" % (name)) 
+    self.log("Starting %s" % (name))
     config=self.getConfig(name)
     if config:
       try:
@@ -414,9 +414,9 @@ class Coven(object):
       with self.plugins_lock:
         self.plugins[name].stop()
         del self.plugins[name]
-      self.log("Stopped %s" % (name),priority=syslog.LOG_INFO) 
+      self.log("Stopped %s" % (name),priority=syslog.LOG_INFO)
     except:
-      self.log("Failed To Stop %s" % (name),priority=syslog.LOG_ERR) 
+      self.log("Failed To Stop %s" % (name),priority=syslog.LOG_ERR)
 
 # ----------------------------------------------------------------------
 
@@ -427,10 +427,10 @@ class Coven(object):
     self.stopPlugin(name)
 
   def process_FileChanged(self,name):
-    self.log("Restarting %s" % (name),priority=syslog.LOG_INFO) 
+    self.log("Restarting %s" % (name),priority=syslog.LOG_INFO)
     self.stopPlugin(name)
     self.startPlugin(name)
-  
+
 # ----------------------------------------------------------------------
 
 if __name__=='__main__':

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=^(?P<prefix>[a-z0-9._-]+)\.genericjmx\.memory_pool-(?P<generation>[a-z]+)\.jmx_memory\.used\.percentage$
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.genericjmx\.memory_pool-(?P<generation>[a-z]+)\.jmx_memory\.used\.percentage\.state$
 

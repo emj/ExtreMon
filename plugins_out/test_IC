@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.in.filter=^be.fedict.eid.prod.trust
 from x3plugin import X3CachingIn
 #-------------------------------------------------------------------------
