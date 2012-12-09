@@ -436,5 +436,5 @@ class Coven(object):
 if __name__=='__main__':
   signal.signal(signal.SIGCHLD, signal.SIG_IGN)
   environ['PYTHONPATH']=sys.path[0]
-  coven=Coven('/opt/extremon/plugins','be.fedict.eid.mon.isolde',('224.0.0.1',1249))
+  coven=Coven('/opt/extremon/plugins','be.apsu.teotihuacan',('224.0.0.1',1249))
   coven.practice()
