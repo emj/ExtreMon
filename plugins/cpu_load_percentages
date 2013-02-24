@@ -3,7 +3,7 @@
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+)\.load\.load\.(short|mid|long)term.percentage$
 
 #   ExtreMon Project
-#   Copyright (C) 2009-2012 Frank Marien
+#   Copyright (C) 2009-2013 Frank Marien
 #   frank@apsu.be
 #
 #   This file is part of ExtreMon.

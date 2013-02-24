@@ -1,5 +1,5 @@
 #   ExtreMon Project
-#   Copyright (C) 2009-2012 Frank Marien
+#   Copyright (C) 2009-2013 Frank Marien
 #   frank@apsu.be
 #
 #   This file is part of ExtreMon.

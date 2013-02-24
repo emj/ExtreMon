@@ -15,7 +15,7 @@
 #x3.out.filter=^be\.(fedict|apsu|colifra)\.
 
 #   ExtreMon Project
-#   Copyright (C) 2009-2012 Frank Marien
+#   Copyright (C) 2009-2013 Frank Marien
 #   frank@apsu.be
 #
 #   This file is part of ExtreMon.
@@ -35,7 +35,7 @@
 #
 # Based on collectd_network.py:
 # https://github.com/octo/collectd/blob/master/contrib/collectd_network.py
-# which is Copyright (c) 2009-2012 Adrian Perez <aperez@igalia.com>
+# which is Copyright (c) 2009-2013 Adrian Perez <aperez@igalia.com>
 # Adrian did all the truly hard stuff parsing the binary format, back in
 # 2009, and gracefully upgraded the licence to GPLv3 for me, in 2012,
 # so that I could add the high-resolution versions that had been added

@@ -3,7 +3,7 @@
 #x3.out.filter=^(?P<node>[a-z0-9._-]+\.(ta|int|prod)\.(dss|pki-ra-mod|trust|idp|pki-ra-por)\.app[1-9])\.state$
 
 #   ExtreMon Project
-#   Copyright (C) 2009-2012 Frank Marien
+#   Copyright (C) 2009-2013 Frank Marien
 #   frank@apsu.be
 #
 #   This file is part of ExtreMon.

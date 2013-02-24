@@ -4,7 +4,7 @@
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.genericjmx\.jms_queuejms\.queue\.(?P<queue>[a-z]+)\.gauge\.messagecount)\.state$
 
 #   ExtreMon Project
-#   Copyright (C) 2009-2012 Frank Marien
+#   Copyright (C) 2009-2013 Frank Marien
 #   frank@apsu.be
 #
 #   This file is part of ExtreMon.

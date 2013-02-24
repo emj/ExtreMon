@@ -3,7 +3,7 @@
 #x3.out.filter=^(?P<prefix>[a-z0-9._-]+\.trust\.app[1-9]\.snmp\.(?P<metric>counter\.failure_crl|counter\.cache_misses|gauge\.cache_hit_percent))\.state$
 
 #   ExtreMon Project
-#   Copyright (C) 2009-2012 Frank Marien
+#   Copyright (C) 2009-2013 Frank Marien
 #   frank@apsu.be
 #
 #   This file is part of ExtreMon.
