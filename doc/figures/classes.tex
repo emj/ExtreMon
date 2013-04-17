@@ -1,0 +1,90 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+\usepackage{graphics}
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{pstricks,pst-node,multido,pst-uml}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\begin{document}
+
+\newcommand{\drawSetAction}{%
+\umlClass{\emph{SetAction}}{%
+- panel \\
+- svgelement \\
+- svgattribute \\
+- format \\
+\hline 
+- perform()
+}}
+
+\newcommand{\drawNumericSetAction}{%
+\umlClass{NumericSetAction}{%
+- multiplier \\
+\hline
++ perform()
+}}
+
+\newcommand{\drawTextSetAction}{%
+\umlClass{TextSetAction}{%
++ perform()
+}}
+
+\newcommand{\drawTimestampSetAction}{%
+\umlClass{TimestampSetAction}{%
++ perform()
+}}
+
+\newcommand{\drawCountdownSetAction}{%
+\umlClass{CountdownSetAction}{%
++ perform()
+}}
+
+\newcommand{\drawPanel}{%
+\umlClass{Panel}{%
+- svgdocument \\
+- defines \\
+- labelToActions \\
+- alterationsQueue \\
+\hline 
++ startUpdate() \\
++ queueAlteration() \\
++ endUpdate()
+}}
+
+\newcommand{\drawAlteration}{%
+\umlClass{Alteration}{%
+- svgelement \\
+- svgattribute \\
+- value \\
+\hline 
++ alter()
+}}
+
+\resizebox{1.0\hsize}{!}{%
+\begin{pspicture}[showgrid=false](-7,0)(7,5)
+\rput(-7,5)		{\rnode{set}	{\drawSetAction}}
+\rput(-7,0)		{\rnode{nset}	{\drawNumericSetAction}}
+\rput(-2.5,0)	{\rnode{tset}	{\drawTextSetAction}}
+\rput(2,0)		{\rnode{tsset}	{\drawTimestampSetAction}}
+\rput(7,0)		{\rnode{cdset}	{\drawCountdownSetAction}}
+
+\rput(0,5)		{\rnode{panel}		{\drawPanel}}
+\rput(7,5)		{\rnode{alteration}	{\drawAlteration}}
+
+\ncSHS[armA=1.5]{set}{nset}\ncputicon{umlHerit} \ncputicon[npos=3,nrot=:U]{umlV}
+\ncSHS[armA=1.5]{set}{tset}\ncputicon{umlHerit} \ncputicon[npos=3,nrot=:U]{umlV}
+\ncSHS[armA=1.5]{set}{tsset}\ncputicon{umlHerit} \ncputicon[npos=3,nrot=:U]{umlV}
+\ncSHS[armA=1.5]{set}{cdset}\ncputicon{umlHerit} \ncputicon[npos=3,nrot=:U]{umlV}
+
+\ncline{set}{panel} \ncputicon{umlAgreg} \nbput[npos=0.25]{0..*} \naput[npos=0.85]{1}
+\ncline{panel}{alteration} \ncputicon{umlCompos} \nbput[npos=0.25]{1} \naput[npos=0.85]{0..*}
+
+\end{pspicture}}
+
+\end{document}

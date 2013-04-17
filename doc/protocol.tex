@@ -1,0 +1,337 @@
+\chapter{Protocols}
+\section{The \rawproto{} Shuttle}
+\label{sec:protocol}
+
+\begin{figure}[ht]
+	\resizebox{1.0\hsize}{!}{ \includegraphics{figures/protocol.eps}}
+	\caption{The \rawproto{} Shuttle} \label{fig:rawproto}
+\end{figure}
+
+An \rawprotoacronym{} shuttle is, intentionally, text-based, human-readable
+and simple. \fig{rawproto} expresses its constituent parts,
+explained below:
+
+\begin{itemize} 
+
+\item records are sent as label-value pairs, with
+the ASCII ``='' (equals) character (hexadecimal value 3d) separating
+label and value, and ASCII linefeed (hexadecimal value 0a) separating
+records (but being considered part of the record) 
+
+\item where records
+are logically grouped, in terms if having one or more common elements
+such a group is called a shuttle. Shuttles are separated by an empty
+line, that is, two record separators (and this is considered part of
+the shuttle) 
+
+\item a label consists of label-items separated by ASCII
+``.'' (full stop) character (hexadecimal value 2e). Label-items either
+represent an information hierarchy, general-to-specific from left
+to right, or a collection of labels whose position is not relevant.
+Only the first situation will be considered here.
+
+\item a value consists of a decimal number, with arbitrary precision,
+optional decimals indicated by one  ASCII ``.'' (full stop) character
+(hexadecimal value 2e), or text, with arbitrary values except as stated
+below, encoded in UTF-8.  
+
+\item since the equals and linefeed characters
+thus have special meaning, they are illegal in both labels and values. A
+full-stop character may occur zero or once in a numerical value, zero
+to N in a textual value.  
+
+\item as a minimum, a shuttle contains a timestamp and a sequence number.
+
+	\begin{itemize}
+	\item a shuttle timestamp last label item is "timestamp", with the
+	rest of the hierarchy being determined by the organisation. It's value
+	is always a number, a high-precision variant of posix time: The whole
+	part a decimal representation of the number of seconds elapsed since
+	midnight on the 1 January 1970 (UTC), the decimal part representing
+	sub-second precision, the first digit representing $\frac{1}{10}$s, the
+	second $\frac{1}{100}$s, etc..
+
+	\item a shuttle sequence number is a monotonic whole number that increases
+	by one. The main sequence that should always be present is the sequence
+	counter of the \cauldron{} component, which is system-wide, by \node{}:
+	This sequence allows all consumers of any \rawproto{}-based protocol
+	to discover lost shuttles instantly by comparing incoming shuttle
+	sequence numbers to the previous shuttle's sequence: it should be exactly
+	one higher. If the difference is more than one, this indicates shuttles 
+	have been lost. While this is not an issue in message-based raw \rawproto{}
+	clients, \diffproto{} clients may choose to mark such a connection as
+	unreliable, or open a new connection to get a full cache dump, to make
+	sure no information was missed.
+	
+	\end{itemize}
+
+\item a value that is derived from one single other value, will append a 
+label-item to the label of the value it was derived from.  
+
+\end{itemize}
+
+\begin{figure}[ht]
+    \resizebox{1.0\hsize}{!}{\includegraphics{figures/protocolexample.eps}}
+	\caption{Examples of \rawproto{} shuttles} \label{fig:shuttleexamples}
+\end{figure}
+
+
+\fig{shuttleexamples} shows 2 shuttles captured from our
+experimental setup at client. The first shuttle is on lines 1 to 32, the
+second, on lines 33 to 35. (the empty lines serving as shuttle separators
+are considered as part of the shuttle).  The shuttle on lines 1 to 32
+has a set of records, most of them numeric, and most of them related to
+measures emanating from collectd agents deployed on the target hosts,
+or contributed from a remote testing probe (line 27 is from such a
+remote probe). Some, however, are internal measures contributed by the
+cauldron or \rawproto{} output, as in lines 13 and 18, which give the
+incrementing shuttle sequence number, and local timestamp of the central
+host.  Some are derived values. Line 20 is a direct measure of free disk
+space, in bytes. On line 21, a read/write \witch{} has consolidated this
+value with the 2 related ones for this specific disk partition (free
+and reserved), and has calculated that 2107334656 bytes corresponds to
+50.6\% free space. On line 22 another read/write \witch{} has taken
+that percentage value, compared it to some appropriate threshold and
+decided that for this disk partition, 50.6\% free was too little,
+but not yet cause for alarm. It contributed a state suffix to the
+percentage measure indicating a state of ``1'' meaning "warning', and,
+on line 23 appended a human-readable explanation to that warning. Note
+that the namespace chosen at client site is hierarchical, according
+to reverse-dns fashion as is usual, for example, in Java package names.
+This allows, for example, for a service provider to gather data from many
+organisations without name collisions.
+
+The second shuttle on lines 33 to 35 has no real measures. It consists
+entirely of the 2 internal measures sent by the dispatcher, to confirm
+that the connection is live, and to allow continuous comparison between
+the clocks of the dispatcher and the local clocks. We would recommend
+that a shuttle be dispatched every tenth of a second, with or without
+actual data.
+
+\section{Transports}
+
+Depending on the component it is used in, the \rawproto{} will be carried
+on different transport protocols: It is designed to carry its own sequence
+indicators, and maintains this even on message-based transports, to
+facilitate development of clients, and to allow multiple shuttles per
+message in message-based transports.
+
+Two cases of \rawproto{} over message-based transports are inherent in
+the backend side of the prototype design, in the local network context
+of \node{}s. These are not used in the front-end strategy, and hence
+never travel over any actual wires or routers.
+
+Preliminary experiments used the UDP multicast facility present in the
+operating system as a low-level publish-subscribe mechanism: \witches{}
+wishing to contribute records could merely transmit shuttles in UDP
+packets to a local multicast address. \witches{} wishing to obtain records
+would join that multicast group, and receive copies of all shuttles
+thus transmitted.
+
+Although, theoretically, transmission errors and lost packets are
+possible in this configuration, the design of the multicast code in
+e.g. the Linux kernel makes this extremely unlikely. The worst-case in
+practice: lost packets, is not a major issue in our design, as the 
+message-based transports are only used in high-bandwidth, local,
+short-circuited protocol stacks, such as the local interface (lo)
+of Unix-like systems, and in that context we're retransmitting 
+all measure results constantly at a high rate. A lost packet's
+values will be resent within a very short period, all the time.
+
+Any contributor in this design accumulates records into a local
+buffer. A running calculation is maintained as to how large a shuttle the
+accumulated data would represent. The records are sent as one shuttle,
+as soon as either the next records would not fit into the maximum size
+of UDP packet allowed, or one tenth of a second have passed since the
+last such packet was sent.
+
+With this technique, the \cauldron{} component could be considered
+another case of COTS reuse: It merely consists of the local network of
+the \node{}(s), and the multicast facilities of the local IP stack.
+
+Later experiments have used the ZeroMQ framework to provide message-based
+PUB-SUB and PUSH facilities. The strategy is the same as in the original
+multicast facility: a contributor accumulates records until a configurable
+maximum is reached or one tenth of a second have passed, after which the
+resulting shuttle is encapsulated into a ZeroMQ message, and transmitted
+from a 0MQ PUSH type socket towards a 0MQ PULL socket listening in a
+cauldron process, whose only role is to transmit the shuttle over a 0MQ
+PUB socket, from where it will be received by all 0MQ SUB type sockets
+that have subscribed to it.
+
+With this technique, the \cauldron{} component is a small daemon program,
+to be developed.  The 0MQ technique is now preferred after concerns
+were raised about the availability of effective multicast semantics in
+cloud-based environments. We'll design our API in such a way as to be
+agnostic of which technology the \cauldron{} component is based upon.
+
+In both cases above, the data per message is exactly one shuttle,
+as described, including the end-of shuttle marker, however, any code
+should interpret messages received as containing 1--n shuttles: multiple
+shuttles per message are likely to occur in later versions.
+
+The input, output and input\slash{}output \witches{} that are managed by the
+\coven{} component read lines of text from their stdin file descriptor,
+write lines of text to their stdout file descriptor, or both. The \coven{}
+component presents them with copies of shuttles containing values limited
+to their subscription, and\slash{}or reads shuttles presented. The Unix
+Pipe mechanism used in both directions is essentially a half-duplex
+stream: shuttles are written back-to-back as they appear. The
+\witch{} reads "lines of text" from stdin, accumulating or handling
+records as they appear, one per line (see \fig{rawproto}).
+An empty line signified a shuttle has just ended, and reading zero bytes
+signifies that the \coven{} component wishes for the \witch{} to shut down.
+
+\label{sec:rawproto}
+
+``Raw'' \rawprotoacronym{} is essentially shuttles (see
+\fig{rawproto}) of all measures, within one tenth of a second
+of their being measures, sent back-to-back over an HTTP connection,
+in what amounts to an infinitely long ``file'' whose size is never
+known beforehand.  The approach is a pragmatic way to leverage the
+ubiquity of the HTTP protocol, its wide availability and accessibility
+in many environments. In practice, raw \rawproto{} will occur rarely,
+as the bandwidth requirements may be prohibitive for general Internet
+use. Outside the \node{} environment, \diffproto{} will be preferred.
+
+\diffproto{} is exactly the same as \rawproto{} (see \ref{sec:rawproto}),
+with the following exceptions:
+
+\begin{itemize}
+
+\item The first shuttle(s) sent after the HTTP response header consist
+of a dump of all values that the sender knows of (and that match
+the URL requested) at that moment in time. These special shuttles
+contain an indicator record of ``cachedump'' with value ``true''
+within the appropriate namespace. Although it is expected that in most
+implementations this ``key frame'' will be sent in one (potentially
+huge) shuttle, implementations should not count on this and use the
+``cachedump'' indicator instead, if they need to distinguish between
+these and subsequent ``differential'' shuttles.
+
+\item The first shuttle sent that has no cachedump indicator, and all
+subsequent shuttles of the current HTTP connection are ``differential''
+shuttles: They do not repeat state already sent, but only indicate changes
+to previous state.  Because many values change rarely, even when measured
+frequently, this allows for huge bandwidth gains.
+
+\end{itemize}
+
+A \diffproto{} client that needs to compare previous or related values
+with incoming updates may wish to keep a local cache that is instantly
+provisioned after the cachedump shuttle(s) and kept up-to-date by
+differential ones.  In such clients, \diffproto{} effectively is a remote
+cache update protocol, and it thus becomes easy to create \diffproto{}
+proxies to limit bandwidth usage, for example, if multiple clients on
+a LAN require the same, or subsets of the same namespace.
+
+\diffproto{} clients that merely need to respond to a particular subset of
+the namespace, without requiring state, may safely ignore the differential
+nature of the protocol: The cache dump will, in their case merely serve
+to supply an initial state.
+
+In practice, The \diffproto{} protocol, as such is expected to occur
+mostly on LAN's, or, on public services. Most organisations will probably
+chose to use one of the secured variants, known as \secproto{}
+
+\label{sec:compproto}
+
+Even casual visual inspection of a few \rawproto{} shuttles immediately
+highlights one striking characteristic of \rawproto{} labels: redundancy.
+All labels carry the same organisation prefix, and since one host in one
+system in one realm can have thousands of measures being streamed in, a
+large part of those longer prefixes will be repeated, many times, as well.
+
+\begin{figure}[ht]
+	\centering
+    \resizebox{1.0\hsize}{!}{\includegraphics{figures/small_shuttle.eps}}
+    \caption{Small \rawproto{} shuttle before compression}
+	\label{fig:smallshuttle}
+\end{figure}
+
+\fig{smallshuttle} shows a small shuttle of 6 records, with
+much redundancy in the labels: All the labels are identical up to and
+including the 6th label part \emph{df}, and even then half the records
+have \emph{boot.free.percentage} following that one common label prefix.
+The prefixtree encoding attempts to remove some of that redundancy by
+
+\begin{itemize}
+
+\item expressing the shuttle as a tree, with nodes created according
+to label parts, from left to right, containing either more nodes
+and\slash{}or values. \fig{smallshuttletree} shows our small
+example, thus represented, and with the tree levels below.
+
+\begin{figure}[ht]
+    \centering
+     \resizebox{1.0\hsize}{!}{\includegraphics{figures/small_shuttle_tree.eps}}
+    \caption{Small \rawordiffproto{} shuttle represented as a tree}
+    \label{fig:smallshuttletree}
+\end{figure}
+
+\item collapsing tree nodes with only 1 child that is not a value to a
+single node with the combined names of the collapsed nodes. \fig{smallshuttlecollapsedtree}
+shows out small example tree, in this collapsed state: Only 4 tree levels remain.
+
+\begin{figure}[ht]
+    \centering
+     \resizebox{1.0\hsize}{!}{\includegraphics{figures/small_shuttle_collapsed_tree.eps}}
+    \caption{Small \rawordiffproto{} shuttle represented as a collapsed tree}
+    \label{fig:smallshuttlecollapsedtree}
+\end{figure}
+
+\item walking the resulting tree outputting lines containing the tree
+depth, the node name, and optionally, an equals sign and the node value
+as more formally described in \fig{prefixtree}).
+
+\end{itemize}
+
+\begin{figure}[ht]
+	\centering
+    \includegraphics{figures/prefixtree.eps} \caption{The
+   \compproto{} Shuttle} \label{fig:prefixtree}
+\end{figure}
+
+\fig{smallshuttleencoded} shows the result of prefixtree-encoding
+the small shuttle from \fig{smallshuttle}: In line 1, the
+collapsed nodes \emph{\clientc,\clientcn,\clientou,\clientrealm,\clientsys, and df} from their
+corresponding label parts in lines 1--6 of \fig{smallshuttle}
+occur only once, at tree level zero, thereby indicating that all lower
+levels should be prefixed with this. In lines 2 and 5, the nodes at level
+one in the tree, express the 2 further label part possibilities, either
+\emph{home.free.percentage} or \emph{boot.free.percentage}.  Note that
+in these cases, these node have their own values as well as expressing
+prefixes for further levels. This is a consequence of the \rawproto{}
+convention that derived values suffix the labels of their source, and
+indicates \emph{percentage.state} was derived from \emph{percentage}. The
+mechanism continues in the same manner into levels 2 and 3 of the tree,
+on lines 3,4,6 and 7 of \fig{smallshuttleencoded}
+
+\begin{figure}[ht]
+	\centering
+    \includegraphics{figures/small_shuttle_prefixtree_encoded.eps}
+    \caption{Small \rawordiffproto{} shuttle
+    encoded as a \compproto{} Shuttle} \label{fig:smallshuttleencoded}
+\end{figure}
+
+With the kind of hierarchy shown, prefixtree-encoding easily reduces
+the size of shuttles by 50\% or more for trivially small shuttles,
+individually encoded. We expect far better ratios for larger shuttles,
+and for variants of the protocol that maintain state between shuttles.
+
+\secproto{} and \seccompproto{} are \diffproto{} or \compproto{}
+transported over HTTPS instead of HTTP.  The acronyms therefore covers
+a range of implementations, SSL and TLS variants, authentication
+schemes, key sizes, etc..  Its exact technical implementation at
+any configuration will depend on the requirements, and rules of the
+organisation involved. All the back-end components implement only the
+plaintext variants of the protocols, and make no attempt at authentication
+or authorization whatsoever, and it is left to the front-end webserver
+and remote clients to agree on the exact security requirements per case.
+The only requirement for an implementation to qualify as being \secproto{}
+resp. \seccompproto{} is that after the authentication was successfully
+performed, the payload transported (encrypted) by the resulting
+protocol is exactly \diffproto{} or \compproto{}. We expect most real-life
+traffic over the Internet will be \seccompproto{}, compressed differential
+\rawproto{} encapsulated inside a HTTPS (TLS) stream.
+

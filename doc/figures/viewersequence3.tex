@@ -1,0 +1,41 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows,shadows} % for pgf-umlsd
+\usepackage{pgf-umlsd}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\begin{document}
+
+\resizebox{!}{0.99\vsize}{%
+\tiny{%
+\begin{sequencediagram}
+\newinst{alternator}{:X3Alternator}
+\newinst{alteration}{:X3Alteration}
+\newthread{document}{:SVGDocument}
+
+\begin{sdblock}{rep}{when CPU avail}
+	\begin{call}{document}{run()}{alternator}{}
+		\begin{sdblock}{rep}{every alteration}
+		\begin{call}{alternator}{alter()}{alteration}{}
+			\begin{sdblock}{alt}{}
+				\begin{call}{alteration}{setAttribute()}{document}{}\end{call}
+				\begin{call}{alteration}{setTextContent()}{document}{}\end{call}
+			\end{sdblock}
+		\end{call}
+		\end{sdblock}
+	\end{call}
+\end{sdblock}
+
+\end{sequencediagram}
+}}
+
+\end{document}
+

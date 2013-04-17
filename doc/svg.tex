@@ -1,0 +1,173 @@
+\newcommand*\svgtag[1]{\textless{}#1\textgreater{}}
+
+\chapter{SVG Viewer Namespace} 
+
+\setlength\fboxsep{4mm}
+\fbox{%
+\begin{minipage}{.9\linewidth}
+\emph{First of all, a word of warning: ExtreMon Display is subject to intense
+discussion and no small measure of thinking on my part into where to
+take it, technology-wise. Drawing the "animatible" SVG schematic with
+all details is no trivial task, and I'm thinking on how to generate it
+rather than requiring someone to draw it. Also, the underlying Apache
+Batik library gives smooth change, zoom, rotate, all I could wish for,
+\emph{but} requires a J2EE runtime environment, and I have serious doubts
+about the future of Java on the workstation. A JavaScript solution is being
+pondered and experimented with, but so far the major stumbling block
+is the rendering performance (or lack thereof) of SVG on browsers: zooming
+non-trivial SVG takes seconds in the best case. This, and the lack of
+layoutmanagers in SVG leads me to consider everything between JavaScript
+Canvas and OpenGL even including (ab)using a 3D game engine. This means
+the information below may change, dramatically, unless the SVG engines
+inside the major browsers get much, much better, soon.}
+\end{minipage}}
+
+\vspace{1cm}
+
+\begin{figure}[!ht]
+	\resizebox{.9\textwidth}{!}{
+	\includegraphics{figures/svgexample.eps}} \caption{An X3Mon SVG Namespace Example}
+	\label{fig:svgexample}
+\end{figure}
+
+To effectively map \rawproto{} records onto SVG elements in an in-memory
+representation of an SVG Document, several new attributes are introduced
+to mesh with existing SVG elements:
+
+\section{SVG Namespace}
+
+\subsection*{The x3mon:define attribute}
+
+\psframebox{$\text{\textless{}svg-tag \textcolor{\hilitecolor}{x3mon:define="variable name:[attr name[/attr-part-name]]"} svg-attr="value" [\ldots{}] \slash{}\textgreater{}}$} 
+
+The x3mon:define attribute creates a named variable referring to the
+value of an attribute or the text content of the SVG element that
+contains it. This allows for arbitrary attributes of any SVG elements
+in the same document to be used in subsequent mappings, so that these
+can be managed visually from within e.g. an SVG editor. For example, I
+keep rectangles outside the document boundaries, that define the colors
+representing state (ok, alert, warning, ..), so these become easy to
+change from within the document. Lines 3--5 of \fig{svgexample} show
+define attributes being used to establish the variables ``statestyle[0]''
+to ``statestyle[2]'', containing the style information of the elements
+they occur in. At runtime, this will result in ``statestyle[0]''
+having the value ``fill:\#79ffb3'', for example. Note that although
+the notation suggests some kind of subscript mechanism, this is only
+implied, the square brackets are simply part of the name here. The
+optional syntax attribute name\slash{}attribute part name allows to set
+the resulting variable to part of the attribute's value. Currently, the
+only attribute on which this is defined are CSS svg:style attributes,
+where the resulting variable may be defined to one part of the element's
+CSS style, its primary use being to use that part in a later x3mon:map
+sset action (see below)
+
+\subsection*{The x3mon:usage attribute}
+
+\psframebox{$\text{\textless{}g \textcolor{\hilitecolor}{x3mon:usage="template" svg:id="template-id"}\textgreater{} [svg-elements\ldots{}] \textless{}g\slash{}\textgreater{}}$}
+
+The x3mon:usage attribute marks an SVG element as being suitable to
+be used in a specific role. Currently, only the value "template" is
+valid which indicates that the element is an SVG group suitable to be
+used as an Extremon template. Lines 7--12 of \fig{svgexample}
+form an x3mon template because of this use of x3mon:usage in its
+topmost SVG <g> element. The identity of this template is determined
+by its SVG id attribute.  This is the only instance where the SVG
+id is significant for our purposes (it is ignored everywhere else).
+This exception was made so as to be able to make
+use of the SVG templating mechanism, the SVG <use> tag, as seen in
+lines 18 and 21 of \fig{svgexample}, where our template used,
+twice. Re-using the existing SVG mechanism allows standard SVG editors
+to represent our template usage, which greatly facilitates editing.
+The similarity ends there, though, since x3mon will replace <use>
+directives by \emph{copies} of the template to allow treating them
+differently to one another, where the original <use> elements all remain
+identical to the template. \fig{svgsubst} shows the same SVG
+document after template instantiation.
+
+\begin{figure}[!ht]
+	\resizebox{.9\textwidth}{!}{
+	\includegraphics{figures/svgsubst.eps}} \caption{An X3Mon SVG Namespace with templates replaced} \label{fig:svgsubst}
+\end{figure}
+
+In \ref{fig:svgsubst}, the SVG <use> elements of \fig{svgexample}
+have both been replaced by the SVG <g> they referred to. The <g> that
+was marked as the template has been removed. Note that this substitution
+will only occur with <use> elements that refer to <g> elements marked
+as x3mon templates: Any other <use> elements will be left undisturbed.
+
+\subsection*{The x3mon:id attribute}
+
+\psframebox{$\text{\textless{}svg-tag \textcolor{\hilitecolor}{x3mon:id="label part[.label part]\ldots{}"} [svg-attr="value"]\ldots{} \slash{}\textgreater{}}$}
+
+The x3mon:id attribute suffixes the \rawproto{} namespace of the
+containing SVG elements, making the identity of the element that contains
+it and those contained by it more specific.  The \rawproto{} identity
+of any SVG element in the document is the concatenation, in depth-first
+traversal order, of any x3mon:id attributes encountered.  Practically,
+this means that SVG group elements may semantically group all the
+child elements they contain into a single branch of the \rawproto{}
+namespace, requiring its children to have only more detailed label
+parts. This establishes a flexible hierarchy of identities inside the SVG
+DOM. \fig{svgsubst} shows the element's resulting identities,
+in gray.
+
+\subsection*{The x3mon:map attribute}
+
+\psframebox{\resizebox{.9\textwidth}{!}{%
+\textless{}svg-tag \textcolor{\hilitecolor}{x3mon:map="$%
+\left[\text{label suffix}\right]\text{:}\left\{%
+\begin{tabular}{c} 
+nset \\ 
+tset \\ 
+tsset \\ 
+cdset \\ 
+sset \\ 
+\begin{sideways}\tiny{\ldots{}}\end{sideways}
+\end{tabular} \right\}\text{([attr]:\#\textpipe{}format[:modifier])}$"} svg-attr\ldots{} \slash{}\textgreater{}}}
+
+The x3mon:map attribute is a list of actions (semicolon-separated, as
+inspired by the SVG style attribute), each one creating a relationships
+between the \rawproto{} namespace (or sub-namespace) and an attribute
+or the text content of the SVG element that contains it
+
+Lines 12,13,18, and 19 of \fig{svgsubst} show map attributes.
+Lines 12 and 18 have two, while lines 13 and 19 only specify one each.
+The nset actions show here don't specify a namespace suffix (the
+field is empty, we start with the colon used as separator, meaning
+they apply to the x3mon:id of the element that contains them. The tset
+actions do specify a suffix meaning they apply to the x3mon:id of their
+elements with that suffixed.  In plain English, lines 12 and 13 of
+\fig{svgsubst} signify:
+
+\emph{When a record with id
+\clientprefix.app1.cpu.0.cpu.steal.value arrives, set
+the width of the \svgtag{rect} element in line 12 to its value, and the
+text content of the \svgtag{text} element from line 13 to ``(its value
+truncated without decimals) \% steal''}
+
+\emph{When a record with id
+\clientprefix.app1.cpu.0.cpu.steal.value.state
+arrives, construct a variable substituting ``\#'' for its value in
+``statestyle[\#]'', look up its value, and set the style attribute of
+the \svgtag{rect} element from line 12 to that value.}
+
+Some essential action types are defined below (but this syntax was
+designed to be extensible); all these set the attribute or text content
+of the element that contains them:
+
+\begin{itemize} 
+\item \emph{nset} (set numeric) formats a value using printf-like syntax, as a floating-point number
+\item \emph{tset} (set text) formats a value using printf-like syntax, as a string of text
+\item \emph{tsset} (set timestamp) formats a value given in seconds since the
+Unix-era into a timestamp
+\item \emph{cdset} (set countdown) formats a value given in seconds to the period of time those seconds represent in
+years, months, days, weeks, days, hours, minutes and seconds.  (this is an approximation since leap years (nor seconds) are taken into account).
+\item \emph{sset} (set style) formats a value using printf-like syntax, and set an individual style element within the target's
+svg:style attribute to the resulting formatted string. This allows for SVG using CSS style (as opposed to distinct style attributes),
+to still have individual style elements impacted by incoming data. The ``attribute'' argument is used to determine the style
+element, as the attribute is hard-coded to ``style''.
+\end{itemize}
+
+The original SVG document, after defines have been recorded, templates
+replaced, and identities established, is ready to respond to some
+\rawproto{} records.

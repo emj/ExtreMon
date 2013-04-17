@@ -1,0 +1,73 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows,shadows} % for pgf-umlsd
+\usepackage{pgf-umlsd}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\begin{document}
+
+\resizebox{!}{0.99\vsize}{%
+\begin{sequencediagram}
+\newthread{inplug}{:InputPlugin}
+\newinst{coven}{:\coven{}}
+\newinst{cauldron}{:\cauldron{}}
+\newinst{chalice}{:\diffproto{}OutPlugin}
+\newinst{chalinst}{:\diffproto{}Conn}
+\newinst{httpd}{:WebServer}
+\newthread{client}{:\diffproto{}Client}
+
+\begin{call}{coven}{subscribe}{cauldron}{}\end{call}
+
+\mess{inplug}{\rawproto{}}{coven}
+\mess{coven}{PUSH}{cauldron}
+\mess{cauldron}{PUB}{coven}
+\mess{coven}{\rawproto{}}{chalice}
+\begin{callself}{chalice}{updatecache}{}\end{callself}
+
+\begin{call}{client}{TLS connect}{httpd}{TLS close}
+	\begin{call}{httpd}{http connect}{chalice}{http close}
+		\begin{call}{chalice}{new}{chalinst}{X}
+
+			\mess{client}{GET}{httpd}
+			\mess{httpd}{GET}{chalinst}
+			\mess{chalinst}{headers}{httpd}
+			\mess{httpd}{headers}{client}
+
+			\begin{sdblock}{region}{cache locked}
+				\begin{call}{chalinst}{get cache}{chalice}{cache}\end{call}
+				\mess{chalinst}{send cache}{httpd}
+			\end{sdblock}
+
+			\mess{httpd}{send cache}{client}
+
+			\begin{sdblock}{response}{while client connected}
+				\mess{inplug}{\rawproto{}}{coven}
+				\mess{coven}{PUSH}{cauldron}
+				\mess{cauldron}{PUB}{coven}
+				\mess{coven}{\rawproto{}}{chalice}
+				\begin{callself}{chalice}{updatecache}{}\end{callself}
+				\begin{call}{chalice}{enqueue diff}{chalinst}{}\end{call}
+				\begin{callself}{chalinst}{dequeue diff}{}\end{callself}
+				\mess{chalinst}{send diff}{httpd}
+				\mess{httpd}{send diff}{client}
+			\end{sdblock}
+
+  		\end{call}
+	\end{call}
+\end{call}
+
+
+
+\end{sequencediagram}
+}
+
+\end{document}
+

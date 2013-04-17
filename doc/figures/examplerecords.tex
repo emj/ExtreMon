@@ -1,0 +1,26 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+% alter the line numbering of the fancyvrb environment to \hilitecolor decimal arabic numbers
+\renewcommand{\theFancyVerbLine}{%
+\textcolor{\hilitecolor}{\small
+\arabic{FancyVerbLine}}}
+
+\begin{document}
+
+\begin{Verbatim}[numbers=left,commandchars=\\\{\},numbersep=6pt,fontsize=\small]
+\clientprefix.app1.cpu.0.cpu.steal.value=77
+\clientprefix.app1.cpu.0.cpu.steal.value.state=2
+\clientprefix.app1.cpu.1.cpu.steal.value=0
+\clientprefix.app1.cpu.1.cpu.steal.value.state=0
+\end{Verbatim}
+\end{document}

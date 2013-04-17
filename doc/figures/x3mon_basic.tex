@@ -1,0 +1,54 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+\usepackage{pstricks,pst-node}
+
+\usepackage{xcolor}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\begin{document}
+
+\begin{pspicture}[showgrid=false](1,-.15)(11,6)
+
+% collector instances
+\Cnode[radius=0.9cm](1,0){mh0}\rput(1,0){collectd}
+\Cnode[radius=0.9cm](1,2){mh1}\rput(1,2){collectd}
+\Cnode[radius=0.9cm](1,4){mh2}\rput(1,4){collectd}
+% any number of them ...
+\rput{90}(1,-1.5){\huge{\ldots}}
+
+% Extremon
+\Cnode[radius=0.9cm](6,2){ca0}\rput(6,2){\node{}}
+% preferably, two ..
+\rput{90}(6,.5){\huge{\ldots}}
+
+% collectors push data to cauldron
+\nccurve[angleB=180,linestyle=dashed]{->}{mh0}{ca0} \ncput*[nrot=:U,npos=.4]{\tiny{\collectdproto{}}}
+\nccurve[angleB=180,linestyle=dashed]{->}{mh1}{ca0} \ncput*[nrot=:U,npos=.35]{\tiny{\collectdproto{}}}
+\nccurve[angleB=180,linestyle=dashed]{->}{mh2}{ca0} \ncput*[nrot=:U,npos=.4]{\tiny{\collectdproto{}}}
+
+% clients
+\Cnode[radius=0.9cm](11,2){vi2}\rput(11,2){viewer}
+% any number of them ..
+\rput{90}(11,.5){\huge{\ldots}}
+
+% cauldron streams values to clients
+\nccurve[angleA=350,angleB=190]{->}{ca0}{vi2} \ncput*[nrot=:U,npos=.7]{\tiny{\diffproto{}}}
+
+% console client and external aggregator stream back operator status
+\nccurve[angleA=10,angleB=170]{<-}{ca0}{vi2} \ncput*[nrot=:U,npos=.7]{\tiny{\diffproto{}}}
+
+% The network..
+\rput[bl](4,-.5){\rnode{A}{}}
+\rput[br](8,-.5){\rnode{B}{}}
+\ncarcbox[nodesep=.2cm,boxsize=.6,linearc=.4,arcangle=140,linestyle=dotted]{<->}{B}{A}
+\nbput[nrot=:D,npos=.5]{Internet}
+
+\end{pspicture}
+
+\end{document}
+

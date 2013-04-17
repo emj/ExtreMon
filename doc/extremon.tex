@@ -1,0 +1,104 @@
+\documentclass[a4paper,11pt]{report}
+
+\pagestyle{plain}
+\usepackage{graphics}
+\usepackage{makeidx}
+\usepackage{nomencl}
+\usepackage{setspace} 
+\usepackage[utf8]{inputenc}
+\usepackage{eurosym}
+\usepackage{booktabs} % prettier tables
+\usepackage{listings} % Pretty-printing source code
+\usepackage{caption} % For custom caption styling in e.g. listings
+\usepackage{datetime}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{tipa}		% for textpipe
+\usepackage{verbatimbox}
+
+% This is the same geometry as in the .dot file provided by Liverpool
+% Had to adjust the bottom margin because Liverpool's was much too small
+% \usepackage[top=2.54cm, bottom=2.54cm, left=3.05cm, right=3.05cm]{geometry}
+
+\usepackage{baskervald}
+\usepackage[T1]{fontenc}
+
+% 'Blac' is a QNTALism :-)
+\usepackage{xcolor}
+\definecolor{Blac}{rgb}{0,0,0}
+\definecolor{LightGray}{rgb}{0.97,0.97,0.97}
+
+% Color the links.. "Blac".. just to avoid the horrible close link boxes in e.g. Evince
+\usepackage[colorlinks]{hyperref}
+\hypersetup{colorlinks=true,linkcolor=Blac,anchorcolor=Blac,citecolor=Blac,filecolor=Blac,urlcolor=Blac}
+
+\lstset{language=Python,
+breaklines=false,
+basicstyle=\footnotesize\ttfamily\bfseries,
+resetmargins=true,
+frame=none,
+belowcaptionskip=1em,
+tabsize=2,
+showtabs=false,
+showspaces=false,
+showstringspaces=false,
+keywordstyle=\bfseries,
+numbers=left,
+numberstyle=\tiny\color{black},
+stepnumber=2,
+numbersep=10pt}
+
+% better table spacing
+\usepackage{booktabs}
+
+% proper units
+\usepackage{siunitx}
+\sisetup{detect-all=true,group-digits=false,binary-units=true}
+
+% composite characters like (R) and TM
+\usepackage{textcomp}
+
+% fig command for consistent references to figures
+\newcommand{\fig}[1]{Fig.\ \ref{fig:#1}}
+
+% LaTeX logo, nicer in roman
+\newcommand*\latex{\textrm{\LaTeX}}
+
+\usepackage{pstricks,pst-node}
+
+% define constants for some acronyms and their meanings so it becomes easy to change them..
+\input{abbreviations}
+
+\usepackage[justification=centering]{caption}
+\usepackage{hyperref}
+\usepackage{hyperxmp}
+
+\hypersetup{
+    pdfauthor={Frank Marien},
+    pdftitle={ExtreMon Manual},
+    pdfcopyright={Copyright (c) 2012-2013 Frank Marien. All rights reserved. - Released under the GNU Free Documentation License v1.2},
+    pdfkeywords={Situation Awareness,Monitoring, Real-time},
+    pdfsubject={ExtreMon Manual}}
+
+\makeindex
+\makeglossary
+\begin{document}
+
+\include{title}
+
+% No parskip during ToC etc.
+\setlength{\parskip}{0pt} 
+
+\addtocontents{toc}{~\hfill\textbf{Page}\par}
+\tableofcontents
+
+\include{node}
+\include{plugins}
+\include{protocol}
+\include{svg}
+\include{dev}
+
+\end{document}
+

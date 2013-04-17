@@ -1,0 +1,74 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0cm]{geometry}
+\usepackage{graphics}
+\usepackage{pstricks,pst-tree}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+\input{../abbreviations}
+
+\pagestyle{empty}
+\begin{document}
+\resizebox{\linewidth}{!}{%
+		\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L2}{\Toval{\clientc}}}{%
+			\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L3}{\Toval{\clientcn}}}{%
+				\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L4}{\Toval{\clientou}}}{%
+					\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L5}{\Toval{\clientrealm}}}{%
+						\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L6}{\Toval{\clientsys}}}{%
+							\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L7}{\Toval{df}}}{%
+								\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L8}{\Toval{home}}}{%
+									\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L9}{\Toval{free}}}{%
+										\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{LA}{\Toval{percentage}~[tnpos=a]{=10}}}{%
+											\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{LB}{\Toval{state}~[tnpos=a]{=2}}}{%
+												\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{LC}{\Toval{comment}~[tnpos=a]{=Less Than 20\% Free!}}}{%
+												}% comment
+											}% state
+										}% percentage
+									}% free
+								}% home
+								\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L8}{\Toval{boot}}}{%
+									\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L9}{\Toval{free}}}{%
+										\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{LA}{\Toval{percentage}~[tnpos=a]{=30}}}{%
+											\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{LB}{\Toval{state}~[tnpos=a]{=1}}}{%
+												\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{LC}{\Toval{comment}~[tnpos=a]{=Less Than 40\% Free!}}}{%
+												}% comment
+											}% state
+										}% percentage
+									}% free
+								}% boot
+							}% df
+						}% sys
+					}% realm
+				}% ou
+			}% cn
+		}% c
+\rput(L0|0,-2){\rnode{LI0}{-2}}
+\rput(L1|0,-2){\rnode{LI1}{-1}}
+\rput(L2|0,-2){\rnode{LI2}{0}}
+\rput(L3|0,-2){\rnode{LI3}{1}}
+\rput(L4|0,-2){\rnode{LI4}{2}}
+\rput(L5|0,-2){\rnode{LI5}{3}}
+\rput(L6|0,-2){\rnode{LI6}{4}}
+\rput(L7|0,-2){\rnode{LI7}{5}}
+\rput(L8|0,-2){\rnode{LI8}{6}}
+\rput(L9|0,-2){\rnode{LI9}{7}}
+\rput(LA|0,-2){\rnode{LIA}{8}}
+\rput(LB|0,-2){\rnode{LIB}{9}}
+\rput(LC|0,-2){\rnode{LIC}{a}}
+\ncline[linestyle=dashed, nodesep=10pt]{L0}{LI0}
+\ncline[linestyle=dashed, nodesep=10pt]{L1}{LI1}
+\ncline[linestyle=dashed, nodesep=10pt]{L2}{LI2}
+\ncline[linestyle=dashed, nodesep=10pt]{L3}{LI3}
+\ncline[linestyle=dashed, nodesep=10pt]{L4}{LI4}
+\ncline[linestyle=dashed, nodesep=10pt]{L5}{LI5}
+\ncline[linestyle=dashed, nodesep=10pt]{L6}{LI6}
+\ncline[linestyle=dashed, nodesep=10pt]{L7}{LI7}
+\ncline[linestyle=dashed, nodesep=10pt]{L8}{LI8}
+\ncline[linestyle=dashed, nodesep=10pt]{L9}{LI9}
+\ncline[linestyle=dashed, nodesep=10pt]{LA}{LIA}
+\ncline[linestyle=dashed, nodesep=10pt]{LB}{LIB}
+\ncline[linestyle=dashed, nodesep=10pt]{LC}{LIC}
+}
+\end{document}
+

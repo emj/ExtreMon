@@ -1,0 +1,90 @@
+\chapter{\node{} Structure}
+\label{sec:node}
+
+\section{General Structure}
+\label{sec:nodegeneral}
+                                                                          
+\begin{figure}[ht]                                                        
+    \centering \includegraphics{figures/x3mon_basic.eps}                   
+    \caption{\node{} Components} \label{fig:x3monbasic}                    
+\end{figure}
+
+The high-level structure of ExtreMon in an Internet context is shown
+in \fig{x3monbasic}: A centralised \node{} passively receives
+internal measures from various hosts using CNP (collectd's UDP-based
+network protocol), actively performs various functional tests on
+these and possibly other hosts and services, and serves the results
+and derived results to a number of clients, for example the ExtreMon
+Display client, over the network, using the DTMP protocol. The dots in 
+\fig{x3monbasic} indicate that normally, there will be many
+hosts monitored, at least two ExtreMon \node{}s, and various clients.
+
+\section{Inside a \node{}}
+\label{sec:nodeoverview}
+
+\begin{figure}[ht]
+    \centering \includegraphics{figures/x3mon_node.eps}
+    \caption{\node{} Components} \label{fig:x3monnode}
+\end{figure}
+
+The structure of a \node{} is shown in \fig{x3monnode}:
+The central component of a \node{} is the ``\cauldron'' around
+which the other components gather. The \cauldron{} is an N..M 
+publish-subscribe mechanism: Any number of writers may present 
+it with shuttles (see \ref{sec:protocol}), it will 
+duplicate them and send a copy of any received shuttles to all
+subscribers. To uncouple the other components from whichever
+mechanism is used to achieve this, the \coven{} component
+connects to the \cauldron{} and abstracts away its pub-sub
+functionality behind a set of simple roles, to be implemented
+by a set of \witches{}. \witches{} fit into one of 3 types:
+
+\section{Write \witches{}}
+\label{sec:write\witches{}}
+
+Write \witches{} acquire measures from some arbitrary source
+and write these to the \coven{} as \rawproto{} shuttles within a 
+particular subset of the namespace. The \coven{} feeds these
+measures into the \cauldron{} using its publish mechanism. 
+In \fig{x3monnode}, a,b, and e represent write \witches{}:
+a reads \collectdproto{} packets from a collectd instance, b probes external 
+web services and measures their response times, e receives 
+operator feedback.
+
+\section{Read \witches{}}
+\label{sec:read\witches{}}
+
+Read \witches{} receive shuttles containing a particular subset
+of the namespace, from the \coven{}, who feeds them by maintaining
+subscriptions to the \cauldron{}'s subscribe mechanism, for them.
+In \fig{x3monnode}, d and f represent read \witches{}:
+d has a local \diffproto{} listener to which the webserver directs \diffproto{}
+requests from the Internet: All external \diffproto{} clients will end
+up being served by this important \witch{}. f is a specialised
+read \witch{} that feeds measures into third-party graphing engine.
+
+\section{Read\slash{}Write \witches{}}
+\label{sec:rw\witches{}}
+
+Read\slash{}Write \witches{} are Read and Write \witches{} combined:
+They both read values from the \coven{}, and contribute other values.
+While other cases are certainly possible, Read/Write \witches{}
+will most often supply aggregation functionalities, reading measured
+values and contributing new values derived from these.
+In \fig{x3monnode}, c represents a read/write \witch{},
+clearly an aggregator, for its lack of external connections.  For example,
+c could be taking absolute values, say, free bytes on disk partitions,
+or free bytes in memory, etc.. Combining them with other measures to
+produce the same information in percentage form, which is easier to
+formulate general thresholds against.  Another read/write \witch{} could
+then be taking these percentages, applying threshold conditions to them
+and contributing alert states, or trending them to predict alert states.
+
+Current \node{}s rely heavily upon a local instance of the collectd agent
+to receive and aggregate measures from various collectd agents deployed
+on the hosts to be monitored, and an instance of a webserver, to supply
+SSL termination, authentication, authorisation, and integration with
+other services, like graphing engines. The \coven{}, and any of the
+current DMTP \witches{} have no form of security whatsoever: while they
+may read metadata supplied by the webserver, the veracity of this is
+entirely left to the latter. This was done intentionally.

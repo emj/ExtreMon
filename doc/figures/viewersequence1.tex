@@ -1,0 +1,42 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows,shadows} % for pgf-umlsd
+\usepackage{pgf-umlsd}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\begin{document}
+
+\resizebox{!}{0.99\vsize}{%
+\tiny{%
+\begin{sequencediagram}
+\newthread{source}	{:X3Source}
+\newinst{client}	{:X3Client}
+\newthread{panel}	{:X3Panel}
+\newinst{action}	{:X3Action}
+
+\begin{call}{source}{sourceData()}{client}{}
+	\begin{call}{client}{clientData()}{panel}{}
+		\begin{callself}{panel}{startUpdate()}{}\end{callself}
+			\begin{sdblock}{rep}{for each record in shuttle}
+				\begin{call}{panel}{perform()}{action}{}
+					\begin{call}{action}{queueAlteration()}{panel}{}	
+					\end{call}
+				\end{call}
+			\end{sdblock}
+		\begin{callself}{panel}{endUpdate()}{}\end{callself}
+	\end{call}
+\end{call}
+
+\end{sequencediagram}
+}}
+
+\end{document}
+

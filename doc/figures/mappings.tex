@@ -1,0 +1,92 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+\usepackage{graphics}
+\usepackage{pstricks,pst-tree,pst-uml}
+\usepackage{booktabs}
+\usepackage{rotating}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\newcommand\Lbn[2]{\Tr{\tiny{\textless{}#1\textgreater{}}}~[tnpos=a]{\tiny{\rotatebox{-90}{\textcolor{gray}{#2}}}}}
+
+% create elide command to express [...] in quotations
+\newcommand*\elide{\textup{[\,\dots]}}
+
+\begin{document}
+	\resizebox{1.0\hsize}{!}{%
+		\begin{tabular}{ccc}
+
+			\tiny{%
+			\begin{tabular}{r}
+				\rnode{cpu0state}{\elide{}.cpu.0.cpu.steal.value.state}	\\ \\ \\ \\ 
+				\rnode{cpu0value}{\elide{}.cpu.0.cpu.steal.value} 		\\ \\ \\ \\
+				\rnode{cpu1state}{\elide{}.cpu.1.cpu.steal.value.state}	\\ \\ \\ \\ 
+				\rnode{cpu1value}{\elide{}.cpu.1.cpu.steal.value}
+			\end{tabular}}
+
+			& 
+
+			\tiny{%
+			\begin{tabular}{l}
+				\rnode[l]{tset0}{\umlClass{TextSetAction}		{ \rnode[r]{svgelem0}{svgelement} \\ svgattribute=style \\ format=\$statestyle{[}\%.0f{]} 	}} \\ \\
+				\rnode[l]{nset0}{\umlClass{NumericSetAction}	{ \rnode[r]{svgelem1}{svgelement} \\ svgattribute=width \\ format=\%.0f 					}} \\ \\
+				\rnode[l]{nset1}{\umlClass{NumericSetAction}	{ \rnode[r]{svgelem2}{svgelement} \\ svgattribute=(null)\\ format=\%.0f \%\% steal 			}} \\ \\
+				\rnode[l]{tset1}{\umlClass{TextSetAction}		{ \rnode[r]{svgelem3}{svgelement} \\ svgattribute=style \\ format=\$statestyle{[}\%.0f{]} 	}} \\ \\
+				\rnode[l]{nset2}{\umlClass{NumericSetAction}	{ \rnode[r]{svgelem4}{svgelement} \\ svgattribute=width \\ format=\%.0f 					}} \\ \\
+				\rnode[l]{nset3}{\umlClass{NumericSetAction}	{ \rnode[r]{svgelem5}{svgelement} \\ svgattribute=null 	\\ format=\%.0f \%\% steal 			}} 
+			\end{tabular}}
+
+			& 
+
+			\pstree[levelsep=6mm,linewidth=.1mm,treemode=L]{\Lbn{svg}{}}{%
+				\pstree{\Lbn{g}{\clientc.\clientcn.\clientou.\clientrealm}}{%
+					\pstree{\Lbn{g}{\clientsys}}{%
+						\pstree{\Lbn{g}{app1}}{%
+							\pstree{\Lbn{g}{cpu.0}}{%
+								\pstree{\Lbn{g}{cpu.steal.value}}{%
+									\Tr{\rnode[l]{rect0}{\tiny{\textless{}rect\textgreater{}}}}
+									\Tr{\rnode[l]{text0}{\tiny{\textless{}text\textgreater{}}}}
+								}
+							}
+							\pstree{\Lbn{g}{cpu.1}}{%
+								\pstree{\Lbn{g}{cpu.steal.value}}{%
+									\Tr{\rnode[l]{rect1}{\tiny{\textless{}rect\textgreater{}}}}
+									\Tr{\rnode[l]{text1}{\tiny{\textless{}text\textgreater{}}}}
+								}
+							}
+						}	
+					}
+				}
+			} 
+
+		\end{tabular}
+
+	\psset{linewidth=.1mm,arrowsize=.5mm,nodesep=.4mm}
+	\nccurve[angleA=0,angleB=180]{->}{cpu0state}{tset0}	
+	\nccurve[angleA=0,angleB=180]{->}{cpu1state}{tset1}	
+
+	\nccurve[angleA=0,angleB=180]{->}{cpu0value}{nset0}	
+	\nccurve[angleA=0,angleB=180]{->}{cpu0value}{nset1}	
+
+	\nccurve[angleA=0,angleB=180]{->}{cpu1value}{nset2}	
+	\nccurve[angleA=0,angleB=180]{->}{cpu1value}{nset3}	
+
+
+
+	\nccurve[angleA=0,angleB=180]{->}{svgelem0}{rect0}	
+	\nccurve[angleA=0,angleB=180]{->}{svgelem1}{rect0}	
+	\nccurve[angleA=0,angleB=180]{->}{svgelem2}{text0}	
+
+	\nccurve[angleA=0,angleB=180]{->}{svgelem3}{rect1}	
+	\nccurve[angleA=0,angleB=180]{->}{svgelem4}{rect1}	
+	\nccurve[angleA=0,angleB=180]{->}{svgelem5}{text1}	
+
+	}
+\end{document}
+

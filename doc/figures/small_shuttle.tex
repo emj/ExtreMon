@@ -1,0 +1,29 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+% alter the line numbering of the fancyvrb environment to \hilitecolor decimal arabic numbers
+\renewcommand{\theFancyVerbLine}{%
+\textcolor{\hilitecolor}{\small
+\arabic{FancyVerbLine}}}
+
+\begin{document}
+
+\begin{Verbatim}[numbers=left,commandchars=\\\{\},numbersep=6pt,fontsize=\small]
+\clientprefix.df.boot.free.percentage=30
+\clientprefix.df.boot.free.percentage.state=1
+\clientprefix.df.boot.free.percentage.state.comment=Less Than 40% Free!
+\clientprefix.df.home.free.percentage=10
+\clientprefix.df.home.free.percentage.state=2
+\clientprefix.df.home.free.percentage.state.comment=Less Than 20% Free!
+
+\end{Verbatim}
+\end{document}

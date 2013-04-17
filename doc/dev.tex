@@ -1,0 +1,499 @@
+\chapter{Development}
+
+\section{Typical Component Interaction Within A \node{}}
+
+\begin{figure}[htbp]                                                        
+  \resizebox{.8\textwidth}{!}{ \includegraphics{figures/sequence.eps}}    
+  \caption{Typical Interactions Within a \node{}}                                         
+  \label{fig:sequence}
+\end{figure}  
+
+\fig{sequence} shows the interaction between \coven{} components.
+This diagram was simplified for legibility. In reality, many of the
+components have their own asynchronous queueing mechanism, effectively
+connecting 2 threads through a synchronized queue. This is only explicitly
+shown in the \compproto{}OutPlugin\slash{}\compproto{}Conn interaction,
+but will also be implemented in e.g. the ZeroMQ implementation of the
+\cauldron{} and many read and write \witches{}
+
+We show one (unspecified) write \witch{}, one specific read \witch{} (\diffproto{}
+server backend), and no read/write \witches{}.
+
+From top to bottom:
+
+\begin{itemize}
+
+\item The \coven{} has launched one write and one read \witch{}, subscribed
+to the \cauldron{} for its read \witch{}, and opened a PUSH type channel
+for each read \witch{}. The latter being stateless, it is not shown.
+
+\item The input \witch{} has values to contribute, hands them to the
+\coven{} by writing them to stdout as \rawproto{} shuttles, whenever it
+has them (which may be frequently).
+
+\item The coven writes the values gathered (possible consolidated)
+to the \cauldron{}'s PUSH channel.
+
+\item The \cauldron{} copies the values received by any input \witches{},
+(possibly consolidated) to all subscribers.
+
+\item The coven{} writes the values received from the \cauldron{}, to
+the stdin pipes of all output \witches{} (possibly filtered for a particular
+subset of the namespace)
+
+\item The \diffproto{}OutputPlugin updates its cache with the values
+received.  While no clients are connected to its front-end listener,
+that is all it does.
+
+\item When an HTTPS connection is accepted from the Internet, the web
+server makes a back-end connection to the \diffproto{}OutputPlugin's
+listener.
+
+\hyphenation{con-nection}
+\hyphenation{in-stan-ti-ates}
+\item for each new connection, the \diffproto{}Plugin instantiates
+a \diffproto{}Connection and hands over the connected socket, which
+handles the connection from reading the HTTP request and until the
+connection closes.
+
+\item the \diffproto{}Connection interprets the HTTP GET, and URL
+information, possibly sets filters to limit the output, to set variants
+in its format, etc..
+
+\item the \diffproto{}Connection requests a cache lock from the
+\diffproto{}Plugin, and requests the entire cache contents (possibly
+filtered), which it sends to the webserver, and releases the lock.
+
+\item While 1..n clients remain connected to the \diffproto{}Plugin
+via its \diffproto{}Connection instances, any cache updates will also
+be journalled, and the differences copied to all outgoing queues, where
+they will be sent over the existing connection at the tempo attainable
+by the specific client. This is the response to incoming data for as
+long as there are clients connected.
+
+\item to terminate, a client closes its TLS connection, which will
+cause the corresponding \diffproto{}Connection to unregister itself
+and terminate.
+
+\end{itemize}
+
+\section{ExtreMon Viewer Runtime}
+
+\begin{figure}[htbp]
+	\resizebox{.8\textwidth}{!}{ \includegraphics{figures/classes.eps}}
+	\caption{Runtime Class Diagram}
+	\label{fig:classes}
+\end{figure}
+
+The in-memory representation of the relationships established between the
+\rawproto{} namespace and the elements in the SVG DOM Tree maintained
+by the SVGCanvas from the Apache Batik library is represented in
+\fig{classes}. The central class is an X3Panel which contains
+the Batik SVG document, doctored as described above, a dictionary storing
+the variables established by x3mon:define attributes, above, a queue
+of Sets of Alteration objects: One Alteration encapsulates exactly one
+.. alteration to either an attribute or the text content of exactly one
+SVG element in the DOM, and a dictionary mapping certain \rawproto{}
+identities to sets of SetAction subclasses that they should cause. Every
+x3mon:map instance in the original SVG document instantiates one SetAction
+subclass, according to its type: ``tset'' instantiates a TextSetAction,
+``nset'' a NumericSetAction, and so forth.
+
+\subsection*{Mapping}
+
+\begin{figure}[htbp]
+	\resizebox{.8\textwidth}{!}{
+	\includegraphics{figures/mappings.eps}} \caption{From \rawproto{} records to SVG DOM elements}
+	\label{fig:mappings}
+\end{figure}
+
+\fig{mappings} illustrates how incoming record are converted
+into SVG alterations at runtime: on the left is an associative array whose
+keys are the full \rawproto{} labels (truncated in front to save space
+in the drawing), mapping to values that are lists of SetAction subclass
+instances. An incoming label is looked up in the associative array,
+and this yields a list of SetActions to be executed in response. Every
+SetAction maintains a reference to the SVG element to act upon, the
+attribute of that SVG element to act upon (or null indicating that the
+text content of the element is the target instead), the format string to
+format the data first, and any modifiers, according to its type. However,
+this does not suffice to alter the SVG DOM: The Batik library does not
+allow its DOM representation to be altered from just any thread, only
+from its own update queue, and the updates can only be passed to it as
+instances of the Java Runnable interface.
+
+\subsection*{Batching Updates}
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{.5\textwidth}{!}{\includegraphics{figures/viewersequence1.eps}}
+	\caption{X3Mon Viewer Calling Sequence Phase 1}
+	\label{fig:viewersequence1}
+\end{figure}
+
+While the SVG DOM is exposed, and may be directly manipulated, this
+leads to undefined behaviour. Because the runtime cost of each Runnable
+object is relatively high vis-a-vis the number of alterations per second
+we expect, we'll present Batik's update queue with a type of Runnable
+that will set as many objects as once as is optimal. Our Alternator
+Class (not shown) is merely a Runnable containing a Set of Alterations,
+that, in its run() method calls each Alteration's alter() method. Our
+X3Panel class, then, receiving records, looks up corresponding SetAction
+subclasses, but these SetActions merely call X3Panel's enqueueAlteration
+to add the required alterations to its alteration queue. This is shown
+in \fig{viewersequence1}
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{.5\textwidth}{!}{\includegraphics{figures/viewersequence2.eps}}
+	\caption{X3Mon Viewer Calling Sequence Phase 2} \label{fig:viewersequence2}
+\end{figure}
+
+In a separate Thread, shown in \fig{viewersequence2}, X3Panel
+unqueues these Alterations, gathers them into Alternator instances
+and presents them to Batik's update queue.  This intermediary stage is
+where it will be possible to tune the number of updates per Alternator,
+according to how the Batik library has tuned updates, which it does
+according to the capabilities of the underlying platform.
+
+\subsection*{Updating The DOM From Batik's updateQueue}
+
+\begin{figure}[htbp]
+	\centering
+	\resizebox{.5\textwidth}{!}{\includegraphics{figures/viewersequence3.eps}}
+	\caption{X3Mon Viewer Calling Sequence Phase 3}
+	\label{fig:viewersequence3}
+\end{figure}
+
+Batik will then, in its own good time, apply them to the SVG DOM,
+eventually rendering them visible. \fig{viewersequence3} shows
+how Batik's updatequeue dequeues X3Mon's Alternator instances and runs
+them, causing various SVG DOM elements to be modified, inside Batik's
+update thread, and at a time appropriate to fluent visual updates (as
+managed by Batik).
+
+\subsection*{The Result: Updated SVG DOM}
+
+\begin{figure}[htbp]
+	\resizebox{.8\textwidth}{!}{
+	\includegraphics{figures/examplerecords.eps}}
+	\caption{Example Incoming \rawproto{} Records}
+	\label{fig:examplerecords}
+\end{figure}
+
+For the example incoming \rawproto{} records in
+\fig{examplerecords}, eventually, our example SVG document from
+\ref{fig:svgsubst} should end up being transformed and reach the state
+as shown in \fig{svgaltered}: The appropriate elements altered
+according to format specified.
+
+\begin{figure}[htbp]
+	\resizebox{.8\textwidth}{!}{
+	\includegraphics{figures/svgaltered.eps}}
+	\caption{Example SVG DOM as altered by incoming records}
+	\label{fig:svgaltered}
+\end{figure}
+
+Finally, \fig{visualexample} shows what the altered SVG may
+look like, represented on the visual display (for cpu.0)
+
+\begin{figure}[htbp]
+	\centering \resizebox{.5\textwidth}{!}{
+	\includegraphics{figures/svgaltered_bars.eps}}
+	\caption{A Visual Example According To The Altered SVG DOM}
+	\label{fig:visualexample}
+\end{figure}
+
+\lstset{ numbers=none,numbersep=0pt,tabsize=2,breaklines=true,resetmargins=true,linewidth=\textwidth }
+
+\section{Core Classes}
+
+The core operation at the heart of many other classes is the assembly and
+timely transmission of \rawproto{} shuttles (see \ref{sec:protocol}).
+The Loom classes encapsulate the desired behaviours of assembling and
+transmitting shuttles of a maximum size, and containing records of
+a maximum age. Thus, the calling class may blindly use the Loom's put
+methods to add individual records, and the Loom instance will accumulate
+these until either there are almost too many of them (max shuttle size)
+or too much time has elapsed (max shuttle age), at which point it will
+call its assigned launcher instance, delegating the actual transmission of
+the shuttle data, since shuttles may be transmitted in various ways. For
+example, the chalice\_out\_http plugin will write shuttles to an open
+TCP connection inside an existing HTTP session, the \coven{} will write
+shuttles to unnamed pipes for its plugins, and multicast them over
+UDP packets, the dump tool will write shuttles to stdout. For example:
+The CauldronSender class is a Loom subclass, and merely provides for
+UDP multicast transport, inheriting everything else from Loom.
+
+\subsection{CauldronServer}
+
+CauldronServer is the base class for creating servers that handle
+distributing shuttles to multiple clients. It handles distribution and
+allows each client their own private queue, so that slow clients do not
+slow down operations for fast clients.
+
+\subsection{ChaliceServer}
+
+ChaliceServer is a specialization of CauldronServer that implements
+the differential protocol (see \ref{sec:protocol}), by sending
+each new connecting client a full set of known values, and only changes
+afterwards.
+
+The Server base classes have only been implemented in Python.
+
+\subsection{DirManager}
+
+DirManager is a utility class that encapsulated the inotify functionality
+if the Linux Kernel, as exposed by the pyinotify module, expands it
+with MD5 checksums, and exposes an interface that calls methods from
+its ``watcher'' delegate with files have been added to, removed from,
+or changed inside the directory it is monitoring. The \coven{} class
+uses a DirManager to watch its plugins directory, allowing plugins to
+activate automatically when added to the plugins directory, shut down
+when removed, shut down and restarted when modified.
+
+\subsection{\coven{}}
+
+The \coven{} class is at the heart of ExtreMon. A Coven instance monitors
+a plugin directory (using a DirManager) and activates the files there
+as ExtreMon plugins, with a hot-plug strategy. Files added (or modified)
+are scanned for ExtreMon plugin headers. If such are found, the file is
+associated with a Plugin instance, which will attempt to execute the
+file, with the configuration headers in its execution environment,
+and with its stdin\slash{}stdout file descriptors redirected to
+Plugin2Cauldron\slash{}Cauldron2Plugin instances, according to its
+interpretation of the presence of input and\slash{}or output filters:
+Plugins with input filters (\#x3.in=) get a Cauldron2Plugin on their stdin
+descriptor, Plugins with output filters (\#x3.out) get a Plugin2Cauldron
+instance on their stdout. The Plugin instance blocks reading from the
+plugin's stderr, passing any lines read to the \coven{} instance for
+logging purposes: Anything a plugin writes to stderr ends up in the
+\coven{}'s log, preceded by the plugin's name. Finally, the \coven{}
+class maintains some statistics about its running plugins, and gathers
+statistics from Cauldron2Plugin and Plugin2Cauldron instances running,
+to contribute using its own CauldronSender instance. The counting
+functionality is encapsulated in the Countable class.
+
+\subsubsection{Cauldron2Plugin}
+
+Cauldron2Plugin instances set up a CauldronReceiver read every shuttle
+that boils, and assemble these into new shuttles containing only records
+matching the plugin's input filter \emph{but not its output filter, if it
+has one}.  These are then written to the plugin's stdin. The limitation
+on the output filter is to avoid endless loops: If the plugin's logic
+were to respond to a record matching its input filter with another record
+that would, it would endlessly repeat that record. Hence, input plugins
+that are also output plugins are not allowed to see their own records.
+
+\subsubsection{Plugin2Cauldron}
+
+Plugin2Cauldron instances set up a CauldronSender read every shuttle
+from the plugin's stdout, passes any that match the plugin's output
+filter to the CauldronSender for contribution to the boiling records.
+
+\section{Plugin Facilitator Frameworks}
+\label{sec:pluginfacilitators}
+
+While the protocol used in ExtreMon plugins was intentionally kept
+extremely straightforward: (for input: read lines from stdin, split them
+around an equals sign, part zero is the label and part one the value,
+ignore empty lines (end of shuttle), to output, write label=value pairs
+to stdout, an empty line if you want your records to be transmitted
+ASAP), this does not mean that it is as trivial do write a CPU-efficient
+plugin when faced with high volumes of records. Also, there are some
+tasks that many plugins will have in common. Many plugins will want
+to match parts of their input filter, and many, for example aggregator
+plugins operating on multiple records at once, will want to maintain a
+cache of certain values.
+
+\subsection{X3In}
+
+By subclassing X3In, a plugin written in the
+Python language will have its overridden ``receive'' method called for
+incoming shuttles matching its input filter. Each shuttle is available
+as a dict() argument.  In the constructor, the subclass may choose to
+enable the caching and\slash{}or capture facility, where caching means
+that the X3In superclass will keep a dict() of the last values received,
+and capture means the X3In superclass will call the receive method with
+an extra argument: a dictionary of all the named regular expression
+group matches present in the input filter.
+
+\subsection{X3Out}
+
+The XOut superclass gives a plugin written in the Python language the
+freedom to call its put() method whenever it has values to contribute, and
+to have these sent as shuttles on its stdout, in a timely and efficient
+manner, even if there are a great many of them, or in the other extreme,
+when there are very few.
+
+X3Out also has a Java implementation.
+
+\subsection{X3IO}
+
+X3IO is a convenience class that makes its subclass both an X3In and
+X3Out.
+
+\subsection{X3Conf and X3Log}
+
+All X3In, X3Out, and X3IO instances are also X3Conf and X3Log instances,
+giving their subclasses access to the plugin configuration data
+(extracted from the environment variables set by the \coven{}), and
+exposing the log() method by which a plugin may write log entries into
+the \coven{}'s log.
+
+\section{Network Client Facilitators}
+\subsection{X3Client}
+
+Although writing a \rawproto{} or \diffproto{} client was intentionally
+made as simple as possible, and the simplest cast comes down to making an
+http connection, and parsing individual lines after the HTTP headers for
+label-value pairs, even this simple task may get more complex once https,
+mutual authentication, or multiple \diffproto{} sources are to be read
+at once, and when reading large volumes or records.  The \diffproto{}
+client classes have been created to greatly simplify such tasks.
+
+To receive shuttles belonging to the part of the namespace it is
+interested in, an application would instantiate an X3Client add as
+many X3Sources as it has \diffproto{} servers to connect to for that
+namespace (for example, the chalice\_out\_http plugin)
+and add itself as an X3Client listener.  The X3Client will then call
+the application's clientData method, passing it all the records that
+have changed from the previous call. If more than one X3Source have
+been added, the X3Client will merge the results and only pass the most
+recently received values. In this way, the application will continue
+to receive records, without any interruption, even if one redundant
+X3Source's connection is lost, for whatever reason.
+
+
+To be able to receive X3Measure records , the application should implement
+the X3ClientListener interface.
+
+An application interested in the state of X3Source connections might
+also implement the X3SourceListener interface , and add itself to
+the individual X3Sources, to obtain notification of connections and
+disconnections.  In the same way, an application might choose to use
+only a single X3Source, and receive that source's records directly,
+without the mediation of an X3Client. An X3Source has a socketFactory
+setter, allowing alternate implementation to be injected, for example,
+to support Mutual SSL with tokens, as we do in the prototype.
+
+\subsection{X3Drain}
+
+The counterpart of an X3Source is an X3Drain , which allows an
+application to contribute records to a \diffproto{} server, such as
+the chalice\_in\_http plugin described above. An X3Drain is a Loom, and
+will therefore disconnect the application's lifecycle from the sending
+of shuttles: The application is free to contribute individual records,
+the X3Drain will transmit them at most max\_shuttle\_age later, in its own
+thread, by HTTP POST. Because of the semantics of the HttpsURLConnection
+class used, HTTP connections that are regularly used will actually make
+use of one TCP connection, using the HTTP keepalive mechanism. This means
+that as long as there are records available every few seconds, shuttles
+will arrive at the server with very little delay, as the connection is
+already open, and any SSL handshake has been performed. This is important
+especially when using Mutual SSL, with smart card tokens, where the
+SSL handshake may take several seconds. An X3Drain has a socketFactory
+setter, allowing alternate implementation to be injected, for example,
+to support Mutual SSL with tokens, as we do in the prototype.
+
+\section{ExtreMon Viewer}
+
+The Visualisation Console (``Console'') is a Java application, deployed
+by Java WebStart, that will open a live schematic view for any Java-
+enabled client.
+
+\subsection{X3Panel}
+
+The main classes of the ``X3 Console'' are the X3Panel which contains
+an Apache Batik JSVGCanvas representing an SVGDocument into which an
+SVG schematic with a supplementary namespace is loaded.
+The X3Panel parses the SVG tags inside the schematic
+and builds an internal structures that allows it to rapidly translate
+incoming \diffproto{} records into alterations to the SVG DOM maintained
+by the JSVGCanvas.
+
+
+Since our chalice\_out\_http plugin plugin will interpret the HTTP GET
+path it is called with as a regular expression, and use that to select
+which subset of the namespace to transmit, here is an opportunity to
+fine-tune bandwidth usage: The X3Panel, after parsing the SVG tags
+linking the schematic to the ExtreMon namespace, has a list of any
+and all \diffproto{} labels it is capable of responding to. Because
+it makes no sense to subscribe to a subset it could not respond to,
+the Subscription class exist to build a specialized regular expression
+based on the labels an X3Panel can respond to, to allow an X3 Console
+to receive only relevant records, and gain bandwidth and CPU cycles.
+
+\subsection{Respondable}
+
+Some SVG elements in the schematic will represent states, and may
+therefore become eligible to connect operator feedback to those
+states. Elements thus selected are stored by the X3Panel as instances
+of Respondable
+
+\subsection{Actions}
+
+The Action classes are the runtime representation of the action tags
+present in the supplementary SVG namespace.
+
+\subsection{Alteration and Alternator}
+
+Since the SVGCanvas instance exposes the underlying DOM, but allows no
+alterations outside a specialised internal Thread, the Action classes can
+never directly alter the DOM (technically, they could, but this leads to
+undetermined behaviour and ultimately, a crash), instead, they convert
+their actions into Alterations, which contain the low-level information on
+what to alter on which element. The Canvas' UpdateManager may be passed
+a Runnable, that is executed inside the Canvas's update thread and this
+runnable is the only way to reliably alter the SVG.  To avoid having to
+pass a great number of Alterations, all Runnables, which would be very
+inefficient, a number of Alterations are gathered inside an Alternator and
+this is passed to the update manager instead.
+
+\subsection{Supporting Classes}
+
+A few supporting utility classes and interfaces follow. SVGUtils
+encapsulates convenience methods to making
+working with the SVG DOM more readable and less verbose. ResponderListener
+is an interface which allows an application to listen for operator actions
+on Respondables. This is how an X3Console detects an operator responding
+to and commenting on a visual state. X3PanelListener is an interface
+which allows its implementor to know when an X3Panel is ready loading and
+parsing the schematic. This is how an X3Console knows that the schematic
+is ready, and it waits for this event before connecting to any X3Sources.
+
+\subsection{User Interaction}
+
+While arguably, user interaction could have been done entirely in SVG,
+development time dictated that we use a more classical approach for
+those few user interactions to be handled at this stage.
+
+A CredentialsDialog is presented when an X3Source encounters a HTTP
+authentication request.  It requests the username and password. This
+could happen, for example, if a front-end webserver were configured for
+HTTP Simple Authentication.
+
+An X3UserAgent  is an implementation of an SVGUserAgentAdapter, which
+is the way the Batik classes communicate problems. Our implementation
+simply logs anything it receives. It was essential to implement this and
+replace the default handler since the latter creates an error dialog
+for each problem, potentially overwhelming the user with dialogs for
+even a small misconfiguration.
+
+A ResponderCommentDialog uses a JOptionPane to present operators with
+a simple dialog into which to type their comments when responding to
+a state.
+
+\subsection{X3Console}
+
+Finally, the X3Console class itself, which brings all this together.
+An X3Console instantiates an X3Panel inside an undecorated JFrame of
+exactly Full HD Size, sets a default authenticator that will request
+credentials from the user with a CredentialsDialog and asks the X3Panel to
+load the SVG schematic.
+
+When the SVG is loaded (and interpreted for actions), the X3Panel calls
+panelReady() and the X3Console creates an X3Client and subscribes to it,
+creates an X3Source, retrieving the subscription regular expression
+that the Subscription class inside the X3Panel has prepared while
+interpreting the SVG.

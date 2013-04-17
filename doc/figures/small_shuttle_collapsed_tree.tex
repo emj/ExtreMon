@@ -1,0 +1,39 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0cm]{geometry}
+\usepackage{graphics}
+\usepackage{pstricks,pst-tree}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+\pagestyle{empty}
+\begin{document}
+\resizebox{\linewidth}{!}{%
+							\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L0}{\Toval{\clientprefix.df}}}{%
+										\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L1}{\Toval{home.free.percentage}~[tnpos=a]{=10}}}{%
+											\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L1}{\Toval{state}~[tnpos=a]{=2}}}{%
+												\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L3}{\Toval{comment}~[tnpos=a]{=Less Than 20\% Free!}}}{%
+												}% comment
+											}% state
+										}% percentage
+										\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L1}{\Toval{home.free.percentage}~[tnpos=a]{=30}}}{%
+											\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L2}{\Toval{state}~[tnpos=a]{=1}}}{%
+												\pstree[treemode=R,levelsep=*5mm]{\rnode[b]{L3}{\Toval{comment}~[tnpos=a]{=Less Than 40\% Free!}}}{%
+												}% comment
+											}% state
+										}% percentage
+									}% free
+\rput(L0|0,-2){\rnode{LI0}{0}}
+\rput(L1|0,-2){\rnode{LI1}{1}}
+\rput(L2|0,-2){\rnode{LI2}{2}}
+\rput(L3|0,-2){\rnode{LI3}{3}}
+\ncline[linestyle=dashed, nodesep=10pt]{L0}{LI0}
+\ncline[linestyle=dashed, nodesep=10pt]{L1}{LI1}
+\ncline[linestyle=dashed, nodesep=10pt]{L2}{LI2}
+\ncline[linestyle=dashed, nodesep=10pt]{L3}{LI3}
+}
+\end{document}
+

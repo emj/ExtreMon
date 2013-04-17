@@ -1,0 +1,56 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+\usepackage{graphics}
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{pstricks,pst-node}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+% alter the line numbering of the fancyvrb environment to \hilitecolor decimal arabic numbers
+\renewcommand{\theFancyVerbLine}{%
+\textcolor{\hilitecolor}{\small
+\arabic{FancyVerbLine}}}
+
+\begin{document}
+
+\begin{Verbatim}[numbers=left,numbersep=6pt,fontsize=\small,commandchars=\\\{\}]
+<svg xmlns:x3mon="http://extremon.org/ns/extremon">
+ \ldots{} 
+ <rect x3mon:define="\rnode[t]{style0}{\textcolor{\hilitecolor}{statestyle[0]}}:style" style="\rnode[t]{style}{\textcolor{\hilitecolor}{fill:#79ffb3;}}"/>
+ <rect x3mon:define="\textcolor{\hilitecolor}{statestyle[1]}:style" style="fill:#ffff00;"/>
+ <rect x3mon:define="\rnode[b]{style2}{\textcolor{\hilitecolor}{statestyle[2]}}:style" style="fill:#ff0000;"/>
+ \ldots{}
+ <g x3mon:usage="template" id="\rnode[r]{template}{\textcolor{\hilitecolor}{x3mon-cpu-core}}">
+  <g x3mon:id="cpu.steal.value">
+   <rect x3mon:map=":nset(width:#);.state:tset(style:$\rnode[b]{styleN}{\textcolor{\hilitecolor}{statestyle[#]}})" width="20" style="\ldots{}
+   <text x3mon:map=":nset(:%.0f %% steal)"></text> 
+  </g>
+ </g>
+ \ldots{}
+ <g x3mon:id="\clientc.\clientcn.\clientou.\clientrealm"
+  <g x3mon:id="\clientsys"
+   <g x3mon:id="app1">
+    <g x3mon:id="cpu.0">
+     <use xlink:href="\rnode[r]{instance0}{\textcolor{\hilitecolor}{#x3mon-cpu-core}}"/>
+    </g>
+    <g x3mon:id="cpu.1">
+     <use xlink:href="\rnode[r]{instance1}{\textcolor{\hilitecolor}{#x3mon-cpu-core}}"/>
+    </g>
+   </g>
+  </g>
+ </g>
+ \ldots{} 
+</svg>
+\end{Verbatim}
+
+\nccurve[linecolor=gray,nodesep=1pt,angleA=90,angleB=90,ncurvA=.2,ncurvB=.2]{->}{style}{style0} 
+\nccurve[linecolor=gray,nodesep=1pt,angleA=270,angleB=90,ncurvA=.2,ncurvB=.5]{->}{style2}{styleN} 
+\nccurve[linecolor=gray,nodesep=1pt,angleA=0,angleB=0]{->}{template}{instance0}
+\nccurve[linecolor=gray,nodesep=1pt,angleA=0,angleB=0]{->}{template}{instance1}
+
+\end{document}

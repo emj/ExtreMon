@@ -1,0 +1,376 @@
+\chapter{Example \witches{}}
+
+ExtreMon \witches{} live in a managed directory, are required to be in the
+venerable *Nix-like ``shebang'' format, that is, they need to start with
+a hash mark and exclamation mark, followed by the path to the intended
+interpreter. Additionally, the interpreter used must recognize the hash
+mark as comment. Of the currently written \witches{}, most are themselves
+Python scripts, and hence have ``\#!/usr/bin/python'' in the first line.
+For our few Java-based \witches{}, we'll use the shell, as interpreter,
+and launch the plugin, compiler into a .jar file, from there.  Comments
+starting with ``\#x3'' are parsed as label-value pairs by the \coven{},
+and placed into environment variables when it executes the plugin. Special
+arguments, such as x3.in.filter and x3.out.filter are, additionally,
+interpreted by the \coven{}: in.filter is a regular expression determining
+which subset of the namespace will be presented to the plugin, out.filter
+is a regular expression determining which subset of the namespace the
+plugin may contribute to.
+
+All of the \witches{} in the sources are currently called ``Example \witches{}''
+because of the Framework nature of the project. Undoubtedly, quite a few
+of them will get consolidated into base classes or ``default'' \witches{}
+as the project progresses. For example, most users are likely to want
+from\_collectd, httpprobes, chalice\_out\_http, several \_percentage and
+several \_state \witches{}, so these will probably become more generic
+and go into a ``default'' class of their own very soon.
+
+\section{Input \witches{}}
+
+Input \witches{} acquire measurements from an external source. We
+distinguish these logically from the External Functional Tests because,
+while the functional tests undertake their down actions by connecting,
+downloading, probing.. these are entirely passive and merely accept
+values from an outside source.
+
+\subsection{from\_collectd}
+
+The from\_collectd plugin arguably, the most important plugin in
+the current portfolio. Its function is to join a multicast group,
+decode \collectdproto{} packets, possibly making some adjustments and
+translations, and contribute them to the \cauldron{} as \rawproto{}
+shuttles.
+
+\collectdproto{} uses strongly typed, but externalised semantics. It
+is therefore necessary to parse the collectd types databases to be
+able to interpret the binary format. The databases contain the number
+of values, value types, and possibly valid ranges for each data type.
+Because collectd uses a binary format, it can liberally allow many
+characters, even in labels. Converting for \rawproto{} which is a
+text-based format therefore requires limiting the range of characters
+allowed in labels. The from\_collectd plugin removes the characters
+specified in the x3.zapgremlins configuration parameter to remain in
+labels, as well as replacing the dots (which are reserved, in \rawproto{})
+in IP addresses by dashes.
+
+Note that the code has the ability to add post-processing functions
+by pattern match, and this is currently used to convert the collectd
+``jiffies'' counter for cpu percentage to pseudo-percentage, and to clamp
+such pseudo-percentage values to 100, as collectd's highly efficient
+but odd strategy in this regard is wont to produce occasional values >
+100\% otherwise (but only as a rounding error, since > 100\% actually
+represents a measure of 100\%, we can safely clamp this here).
+
+Finally, parsing \collectdproto{} ourselves, we are also faced
+with the task of deriving values marked as such, ourselves (where
+collectd does this internally, otherwise). For DS\_TYPE\_DERIVE,
+we therefore contribute to the \cauldron{} a value computed as
+$\frac{V_{n}-V_{n-1}}{T_{n}-T_{n-1}}$ where $V_n$ is the current measure,
+$V_{n-1}$ the last measure, $T_n$ the time of the current measure, and
+$T_{n-1}$ the time of the last measure, instead of the raw, received
+value, which is actually a counter, counting upwards.  For example, CPU
+usage percentages, per CPU core or per process are actually transmitted
+as the number of *Nix \emph{jiffies} that the target has been consuming
+cpu resources. This may be problematic in case of low usage.
+
+\subsection{httpprobes}
+
+The httprobes plugin is a very general, multithreaded http(s)
+service tester.  Based upon a separate configuration file, formatted
+as JSON, which is read by the main ResponseTimeProbes class, a series
+of ResponseTimeProbe instances is created, one per URL to test. Each
+ResponseTimeProbe is passed the parameters of what and how to test,
+and runs this in a separated thread.  Any decisions reached are directly
+contributed to the main class through its put method (which it inherits
+from X3Out). In this manned, many HTTP(S) tests can be ran, with different
+rules, speeds, expectations and responses, each only trivially impacting
+the timing of the others.
+
+The httpprobes can follow redirects if required, seek through the response
+for text and for a specific HTTP response code, for http and https
+URLs. Each URL tested can have its own testing frequency and settings.
+It contributes an appropriate status and diagnostic message.
+
+httpprobe's configuration file is JSON-formatted:
+
+\begin{verbatim}
+{
+"name.space.extension":{"url":"https://the.url.to.probe"[,option..]}
+...
+}
+\end{verbatim}
+
+Options are: "interval" the number of seconds to wait after each probe
+(default:1), "follow" ("yes" or "no") whether to follow HTTP redirects (default:no),
+expect\_code the HTTP response code considered ``normal'' for the URL,
+and expect\_text, a string that is supposed to be found in the data returned
+from the URL. For example, to test http://secure.globalsign.net/crl/root.crl
+every 10 seconds for connection and a 2XX HTTP response:
+
+\begin{verbatim}
+{
+"ext.globalsign.crl":{"url":"http://secure.globalsign.net/crl/root.crl",
+                      "interval":10}
+}
+\end{verbatim}
+
+The config above will insert \$prefix.ext.globalsign.crl.responsetime,
+\$prefix.ext.globalsign.crl.result and \$prefix.ext.globalsign.crl.result.comment
+into the \coven{}, every 10 seconds, representing the response time in ms,
+the result (was it OK or an error) and a textual comment explaining the
+result.
+
+\subsection{chalice\_in\_http}
+
+The chalice\_in\_http plugin in is the counterpart of the
+chalice\_out\_plugin in that, instead of streaming shuttles to
+clients using a HTTP GET method, it allows clients to submit shuttles
+using a HTTP POST request.  Although this might be used, in the future, to
+accept \rawproto{} streams from external sources, at time of writing, its
+only function is to enable operators at the ExtreMon Viewer to indicate
+their involvement with specific states or components, and to write their
+comments for others.  Obviously, this requires both authentication and
+authorization. None of the internal parts of ExtreMon have security
+features, as by design, this is left to the front-end webserver. This is
+a case where information from that front-end is passed on, though. The
+chalice\_in\_plugin requires the presence of two custom HTTP header
+fields: X-FirstNames and X-LastName which it will use to construct an
+``Operator Name'' for use in contributing \emph{responding} states.
+
+\begin{lstlisting}[caption=Mutual SSL Authentication and Authorization
+using DN,label=lst:libation_apache_snippet]
+
+<VirtualHost XXX.XXX.XXX.XXX:443>
+
+[...]
+
+  <Location /console/libation>
+    ProxyPass http://localhost:17617 retry=0 ttl=10
+		Order allow,deny
+    Allow from all
+		SSLVerifyClient require
+		SSLOptions +FakeBasicAuth
+    RequestHeader set X-NotAfter           "%{SSL_CLIENT_V_END}s"
+    RequestHeader set X-DistinguishedName  "%{SSL_CLIENT_S_DN}s"
+    RequestHeader set X-Firstnames         "%{SSL_CLIENT_S_DN_G}s"
+    RequestHeader set X-LastName           "%{SSL_CLIENT_S_DN_S}s"
+		Satisfy All
+		AuthType Basic
+		AuthName "x3_console_libation"
+		AuthBasicProvider file
+		AuthUserFile /etc/apache2/extremon_eid_users
+		Require valid-user
+  </Location>
+
+[...]
+
+  SSLEngine on
+	SSLCertificateChainFile "/etc/apache2/ssl/gov_ca_chain.pem"
+  SSLVerifyDepth 4
+
+[...]
+
+</VirtualHost>
+\end{lstlisting}
+
+Listing \ref{lst:libation_apache_snippet} is a (redacted) snippet from
+the Apache webserver configuration that handles the security for this
+plugin: It is a VirtualHost with SSL enabled, and mandatory Mutual
+Authentication. The CertificateChainFile contains the Belgian Citizen
+CA's, so that it requires a valid Belgian Electronic Identity card
+to be able to use this URL (and the card will require the citizen's
+PIN code before being able to set up Mutual SSL). Moreover, the
+combination of the +FakeBasicAuth option and Satisfy All requires that
+the Distinguished name of the citizen's Authentication certificate
+be listed in \slash{}etc/apache2\slash{}extremon\_eid\_users before
+access is granted. Enrolling operators with feedback capability
+therefore becomes a matter of appending their DN to that file. Once
+established, the SSL\_CLIENT\_ variables contain various fields from the
+operator's authentication certificate, their firstnames and last name,
+amongst others.  These are then added as HTTP Headers by RequestHeader
+directives. Finally the request is served by the chalice\_in\_http plugin,
+in the backend, which may be confident that the caller is an authorized
+operator, and that the names in the X-FirstNames and X-LastName headers
+are accurate.
+
+\subsection{twitter}
+
+The twitter plugin was a somewhat playful addition to the prototype's
+plugin portfolio. Its rationalized purpose might be to display
+theme-related tweets during incidents that would impact large parts of the
+population. The plugin is capable of following a list of users on Twitter
+using that company's streaming API, and contributing their tweets to the
+\cauldron{}, as they occur, allowing any other \witches{} or \diffproto{}
+clients to read these, e.g. display them on an ExtreMon Viewer. Early
+versions have been extremely useful, however, in testing many other
+mechanisms inside the prototype, for properly handling encoding and
+volume issues: Connecting the Stream API's testing features flooded
+the \cauldron{} and related components with a high volume of records
+whose data part used many different writing systems. This amounted to
+an effective ``fuzzing'' test of those components. Also, because of the
+unavailability of the required oauth components for python 3, this has
+forced us to ensure python 2 compatibility for the whole of the prototype,
+and important exercise because python 2 is still widely used.
+
+Config is in ``INI'' like syntax, and must contain at least the oauth
+credentials for the Twitter Streaming API, and a target group containing
+either users to follow and\slash{}or strings to track.
+
+\begin{verbatim}
+[token]
+key=123456789-dsfkgjsdfhlkcgsjdfhcglkdjfcghldjkcgshdnl
+secret=dsjghdslfcgjsdfhlncgjsdnhflcgksjldfjcgsnhl
+
+[consumer]
+key=sgdgdfgcdfgcsdkgjdgd
+secret=xdfjghcsldfukcgshgjlksdfhcgldsfjcghsnljkgs
+
+[target]
+follow=patrickdebois,krisbuytaert,lusis,fedtron,amonthemetalhead
+track=loadays,extremon,commons-eid,eid-mw
+\end{verbatim}
+
+\section{Output \witches{}}
+
+Output Plugins use selected values boiling at the ExtreMon \cauldron{} and
+output them to other systems.
+
+\subsection{chalice\_out\_http}
+
+The chalice\_out\_http plugin is an HTTP server, based on the standard
+python HTTPServer and BaseHTTPRequest classes, and rendered multithreaded
+using the accompanying standard ThreadingMixIn class.
+
+The main class: HTTPSelectiveChaliceDispatcher is an X3IO subclass (see
+Section \ref{sec:pluginfacilitators}) that passes incoming shuttles to
+the single HTTPSelectiveChaliceServer it instantiates, and contributes
+statistics about the number, and possibly identity of the connected
+clients.
+
+The single HTTPSelectiveChaliceServer instance, being a also ChaliceServer
+has a write() method to accept and enqueue incoming shuttles.
+
+When a new connection arrives, accepts the connection, instantiates a new
+HTTPSelectiveChaliceRequestHandler, passing it the connected socket, so
+each connection is handled by its own HTTPSelectiveChaliceRequestHandler
+instance.
+
+The Request Handler's do\_GET() method is called by the framework, for
+HTTP GET requests. The request handler interprets the URI path received
+as a simplified regular expression, sends HTTP response headers, creates
+an output queue, adds itself to the HTTPSelectiveChaliceServer as a
+consumer, and loops reading from its output queue and writing records
+from the shuttles enqueued there, filtered by the regex in the path,
+to the open connection. This is an endless loop, that will keep writing
+shuttles until either the client disconnects, or the plugin is terminated.
+
+shuttles are enqueued because the HTTPSelectiveChaliceServer will
+distribute shuttles to all its subscribers using by calling their
+write() methods.  HTTPSelectiveChaliceRequestHandler's write() method
+simply queues the shuttle, allowing the ChaliceServer to serve all the
+other subscribers, decoupling the throughput of the server from any and
+all subscribers.
+
+Any lag in reading shuttles will cause the queue to grow, a shuttle
+written out to the client will cause the queue to shrink. When the queue
+reaches one thousand entries, new entries are silently discarded. Clients
+can easily detect this because this will cause missing shuttle sequence
+numbers.
+
+\begin{lstlisting}[caption=Integrating chalice\_out\_http
+,label=lst:chalice_out_apache_snippet]
+
+<VirtualHost XXX.XXX.XXX.XXX:443>
+
+	  <Location /console/chalice>
+    ProxyPass http://localhost:17817 retry=0 ttl=10
+    Order allow,deny
+    Allow from YYY.YYY.YYY.YYY ZZZ.ZZZ.ZZZ.ZZZ
+  </Location>
+
+</VirtualHost>
+\end{lstlisting}
+
+Listing \ref{lst:chalice_out_apache_snippet} gives an example of how
+to integrate chalice\_out\_http into your webserver's URL space (Apache
+HTTP example).
+
+\subsection{to\_graphite}
+
+The to\_graphite plugin feeds records into graphite's processing backend
+called \emph{carbon}. The to\_graphite plugin reads
+all values present in the namespaces specified, connects
+to the carbon\_cache daemon and writes the values to it in its internal
+(pickle) API, which is the fastest way of injecting large volumes of
+measures effectively.
+
+\section{Input\slash{}Output ``Derivative'' \witches{}}
+
+\subsection{average}
+
+The average plugin  plugin calculates a basic cumulative moving average
+over an essentially eternal period. It features state persistence
+to be able to survive a restart without losing state. This was
+the first attempt at contributing averages, and was mainly useful
+in establishing the visualisation and state determination based on
+averages. This type of average becomes too viscose to be useful, after
+a few hours, which is why the Modified Moving Averages \witches{} were
+introduced.
+
+\subsection{mma\_ \witches{}}
+
+The mma\_ \witches{} currently compute $\forall{}W\in{}[1,5,15], A(W)_n =
+V_n + e^{-\frac{1}{W\times60}} \times ( A(W)_{n-1} - V_n )$ ---averages
+over 1, 5 and 15-minute intervals, but which could be trivially adapted
+to produce averages over any interval---. Note the unusual configuration
+directive \emph{reject.outlier.above}, which should stand out as instantly
+suspicious: However, the combination of the manner in which the Linux
+kernel reports cpu usage, our \SI{1}{\hertz} sampling interval, and our
+custom-built derivation method for DS\_DERIVED\_ types transmitted by
+the collectd daemons, create issues when measuring low CPU usage, causing
+cpu percentages of up to 30 times the actual value reported by the OS's
+own toolsets to appear in our calculated output.  Careful comparison
+of the build-in GNU/Linux tools' appraisal of CPU usage and our results
+showed that these outlier needed to be rejected to obtain a near-linear
+correlation between those tools, considered the reference, and our own
+results. 
+
+\subsection{\_percentage \witches{}}
+
+\_percentage \witches{} are very similar in terms of structure: All of
+them convert a series of related absolute measures into corresponding
+percentages. They are prime examples of the usage of the cache and capture
+facilities of the X3In Plugin Facilitator framework, as they all need
+to capture groups from the labels of their input filters (capture),
+and require all values in a series in order to make their calculation
+(cache). The \_percentage \witches{} have much redundant logic and are
+prime candidates for consolidation into one more general plugin.
+
+\subsection{\_state \witches{}}
+
+The \_state \witches{} below are very similar in terms of structure:
+The take a series of measured contributed by other \witches{}, make a
+determination of the \emph{normality} of those values and contribute
+corresponding \emph{state} information: OK, WARNING, ALERT or MISSING,
+and possible comments that go with their appraisal. Most of the decision
+making centers around thresholds found in typical monitoring tools. Some
+go a little further.  For example, the responsetime\_state compares to
+thresholds, but also to an average value for the measure, where available
+(see the averages and mma\_repsonsetime \witches{}, resp. and to an overall
+minimum it keeps for itself, reasoning that if a service responds faster
+than the overall minimum, this can indicate a faulty test.
+
+The node\_state and system\_state \witches{} stand out in terms
+of functionality. They are both state and aggregators \witches{}.
+Both aggregate states of parts of the namespace and contribute the
+worst state in that prefix. node\_state does this at the level of one
+application server node, the smallest unit of redundancy for a backend
+cluster or load-balanced back-end: The contributed state is the worst of
+the states of any of the states reported within that node's namespace. The
+system\_state plugin does the same, at a system level, encompassing nodes,
+dependencies, and functional tests within that system's namespace.
+These \witches{} are useful at an overview level, to rapidly ascertain
+where problems exist, before zooming in to details.  This is also the
+point where external dependency tests should be integrated: If we know
+that a system cannot function without a certain external dependency,
+than the state of that system's namespace should be at ALERT whenever
+that external dependency is proven to be unavailable.

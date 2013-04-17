@@ -1,0 +1,53 @@
+\documentclass[10pt]{article}
+\pagestyle{empty}
+\usepackage{graphics}
+\usepackage{color}
+\usepackage{fancyvrb}
+\usepackage{pstricks,pst-node,multido}
+\usepackage{tgheros}
+\usepackage{tgtermes}
+\usepackage{tgcursor}
+\usepackage[T1]{fontenc}
+
+\input{../abbreviations}
+
+% alter the line numbering of the fancyvrb environment to \hilitecolor decimal arabic numbers
+\renewcommand{\theFancyVerbLine}{%
+\textcolor{\hilitecolor}{\small
+\arabic{FancyVerbLine}}}
+
+\begin{document}
+
+\begin{Verbatim}[numbers=left,numbersep=6pt,fontsize=\small,commandchars=\\\{\}]
+<svg xmlns:x3mon="http://extremon.org/ns/extremon">
+ \ldots{} 
+ <rect x3mon:define="statestyle[0]:style" style="fill:#79ffb3;"/>
+ <rect x3mon:define="statestyle[1]:style" style="fill:#ffff00;"/>
+ <rect x3mon:define="statestyle[2]:style" style="fill:#ff0000;"/>
+ \ldots{}
+ <g x3mon:id="\clientc.\clientcn.\clientou.\clientrealm"\rnode{ns0}{>}   \rnode{accu0}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm}}
+  <g x3mon:id="\clientsys"\rnode{ns1}{>}             \rnode{accu1}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm.\clientsys}}
+   <g x3mon:id="app1"\rnode{ns2}{>}               \rnode{accu2}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm.\clientsys.app1}}
+    <g x3mon:id="cpu.0"\rnode{ns3}{>}             \rnode{accu3}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm.\clientsys.app1.cpu.0}}
+     <g x3mon:id="cpu.steal.value"\rnode{ns4}{>}  \rnode{accu4}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm.\clientsys.app1.cpu.0.cpu.steal.value}}
+      <rect x3mon:map=":nset(width:#);.state:tset(style:$statestyle[#])" width="20" style="\ldots{}
+      <text x3mon:map=":nset(:%.0f %% steal)"></text> 
+     </g>
+    </g>
+    <g x3mon:id="cpu.1"\rnode{ns5}{>}             \rnode{accu5}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm.\clientsys.app1.cpu.1}}
+     <g x3mon:id="cpu.steal.value"\rnode{ns6}{>}  \rnode{accu6}{\textcolor{gray}{\clientc.\clientcn.\clientou.\clientrealm.\clientsys.app1.cpu.1.cpu.steal.value}}
+      <rect x3mon:map=":nset(width:#);.state:tset(style:$statestyle[#])" width="20" style="\ldots{}
+      <text x3mon:map=":nset(:%.0f %% steal)"></text> 
+     </g>
+    </g>
+   </g>
+  </g>
+ </g>
+ \ldots{}
+</svg>
+\end{Verbatim}
+
+\multido{\nA=0+1}{7}{%
+	\ncline[linecolor=gray,linestyle=dotted,nodesep=1mm]{ns\nA}{accu\nA}}
+
+\end{document}
