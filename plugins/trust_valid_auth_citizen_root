@@ -6,7 +6,7 @@
 #x3.trust.domain=BE-AUTH
 #x3.return.revocation.data=no
 #x3.prefix=be.fedict.eid.prod.trust.validauthcertchain
-#x3.url=https://trust-ws.services.belgium.be/eid-trust-service-ws/xkms2
+#x3.url=<URL of XKMS2 service>
 #x3.delay=1000
 #x3.out.filter=be\.fedict\.eid\.prod\.trust\.validauthcertchain\.(responsetime|result|result\.comment)$
 
