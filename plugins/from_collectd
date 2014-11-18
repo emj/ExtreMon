@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #x3.types.db=/usr/share/collectd/types.db
 #x3.types.db.custom=/usr/share/collectd/types.db.custom
-=======
-#!/usr/bin/env python3
-#x3.types.db=/opt/collectd/share/collectd/types.db
-#x3.types.db.custom=/opt/collectd/share/collectd/types.db.custom
->>>>>>> 3447234c4dac9d81121cdace43564689b4286f0b
 #x3.zapgremlins=[^a-z0-9._/;:-]+
 #x3.host=224.0.0.1
 #x3.port=1250
